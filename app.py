@@ -5,14 +5,43 @@ import os
 
 app = Flask(__name__)
 
-BASE_DIR = 'projects'
+BASE_DIR = 'data'
 ANNOTATIONS_DIR = 'annotations'
-CATEGORY_COLUMNS = ['label', 'link_available']  # Add your category columns here
-CATEGORY_COLUMNS = ['section','significant_change', 'future_past','theme_category', 'company_impact']  # Add your category columns here
+DEFAULT_CATEGORY_COLUMNS = ['section','significant_change', 'future_past','theme_category', 'company_impact']
+
+def get_project_settings(project_name):
+    settings_file = os.path.join(BASE_DIR, project_name, 'project_settings.json')
+    if os.path.exists(settings_file):
+        with open(settings_file, 'r') as f:
+            return json.load(f)
+    return {
+        'category_columns': DEFAULT_CATEGORY_COLUMNS,
+        'objective': ''
+    }
+
+def save_project_settings(project_name, settings):
+    settings_file = os.path.join(BASE_DIR, project_name, 'project_settings.json')
+    os.makedirs(os.path.dirname(settings_file), exist_ok=True)
+    with open(settings_file, 'w') as f:
+        json.dump(settings, f)
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/settings/<project>')
+def project_settings(project):
+    return render_template('settings.html', project=project)
+
+@app.route('/get_project_settings/<project>')
+def get_settings(project):
+    return jsonify(get_project_settings(project))
+
+@app.route('/save_project_settings/<project>', methods=['POST'])
+def save_settings(project):
+    settings = request.json
+    save_project_settings(project, settings)
+    return jsonify({'success': True, 'message': 'Settings saved successfully'})
 
 @app.route('/get_projects')
 def get_projects():
@@ -26,6 +55,11 @@ def create_project():
         project_path = os.path.join(BASE_DIR, project_name)
         if not os.path.exists(project_path):
             os.makedirs(project_path)
+            # Initialize default settings
+            save_project_settings(project_name, {
+                'category_columns': DEFAULT_CATEGORY_COLUMNS,
+                'objective': ''
+            })
             return jsonify({'success': True, 'message': 'Project created successfully'})
         else:
             return jsonify({'success': False, 'message': 'Project already exists'})
@@ -57,7 +91,9 @@ def load_csv(project, filename):
         df = pd.read_csv(file_path).fillna('')
         data = df.to_dict(orient='records')
         columns = df.columns.tolist()
-        categories = {col: df[col].unique().tolist() for col in CATEGORY_COLUMNS if col in df.columns}
+        settings = get_project_settings(project)
+        category_columns = settings['category_columns']
+        categories = {col: df[col].unique().tolist() for col in category_columns if col in df.columns}
         return jsonify({'data': data, 'columns': columns, 'categories': categories})
     return jsonify({'error': 'File not found'})
 

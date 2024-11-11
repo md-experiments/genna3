@@ -20,145 +20,149 @@ document.addEventListener('DOMContentLoaded', () => {
     projectSelect.addEventListener('change', updateProjectSelect);
     newProjectBtn.addEventListener('click', createNewProject);
 
-
-// Check for saved mode preference
-if (localStorage.getItem('darkMode') === 'true') {
-    document.body.classList.add('dark-mode');
-    modeSwitch.checked = true;
-}
-
-function toggleDarkMode() {
-    document.body.classList.toggle('dark-mode');
-    localStorage.setItem('darkMode', modeSwitch.checked);
-}
-
-function updateProjectSelect() {
-    currentProject = projectSelect.value;
-    loadProjectFiles(currentProject);
-}
-
-function createNewProject() {
-    const projectName = prompt("Enter new project name:");
-    if (projectName) {
-        fetch('/create_project', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ project_name: projectName }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                loadProjects();
-                alert('Project created successfully!');
-            } else {
-                alert('Failed to create project. Please try again.');
-            }
-        })
-        .catch(error => console.error('Error:', error));
+    // Check for saved mode preference
+    if (localStorage.getItem('darkMode') === 'true') {
+        document.body.classList.add('dark-mode');
+        modeSwitch.checked = true;
     }
-}
 
-function uploadCSV() {
-    const file = csvFile.files[0];
-    if (file && currentProject) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('project', currentProject);
-
-        fetch('/upload_csv', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.filename) {
-                loadProjectFiles(currentProject);
-            }
-        })
-        .catch(error => console.error('Error:', error));
-    } else {
-        alert('Please select a project and a file to upload.');
+    function toggleDarkMode() {
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('darkMode', modeSwitch.checked);
     }
-}
 
-function loadProjects() {
-    fetch('/get_projects')
-    .then(response => response.json())
-    .then(projects => {
-        projectSelect.innerHTML = '<option value="">Select Project</option>';
-        projectList.innerHTML = '';
-        projects.forEach(project => {
-            const option = document.createElement('option');
-            option.value = project;
-            option.textContent = project;
-            projectSelect.appendChild(option);
+    function updateProjectSelect() {
+        currentProject = projectSelect.value;
+        loadProjectFiles(currentProject);
+    }
 
-            const li = document.createElement('li');
-            li.className = 'nav-item';
-            li.innerHTML = `
-                <a class="nav-link project-link" href="#" data-project="${project}">
-                    <i class="bi bi-chevron-right"></i> ${project}
-                </a>
-                <ul class="nav flex-column project-files" style="display: none;"></ul>
-            `;
-            projectList.appendChild(li);
-        });
-
-        // Add event listeners to project links
-        document.querySelectorAll('.project-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const projectName = link.getAttribute('data-project');
-                const filesContainer = link.nextElementSibling;
-                const chevron = link.querySelector('i');
-
-                if (filesContainer.style.display === 'none') {
-                    loadProjectFiles(projectName, filesContainer);
-                    filesContainer.style.display = 'block';
-                    chevron.classList.replace('bi-chevron-right', 'bi-chevron-down');
+    function createNewProject() {
+        const projectName = prompt("Enter new project name:");
+        if (projectName) {
+            fetch('/create_project', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ project_name: projectName }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadProjects();
+                    alert('Project created successfully!');
                 } else {
-                    filesContainer.style.display = 'none';
-                    chevron.classList.replace('bi-chevron-down', 'bi-chevron-right');
+                    alert('Failed to create project. Please try again.');
                 }
-            });
-        });
-    })
-    .catch(error => console.error('Error:', error));
-}
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    }
 
-function loadProjectFiles(project, container = null) {
-    fetch(`/get_project_files/${project}`)
-    .then(response => response.json())
-    .then(files => {
-        const filesContainer = container || document.querySelector(`[data-project="${project}"]`).nextElementSibling;
-        filesContainer.innerHTML = '';
-        files.forEach(file => {
-            const li = document.createElement('li');
-            li.className = 'nav-item d-flex justify-content-between align-items-center';
-            const a = document.createElement('a');
-            a.className = 'nav-link csv-file';
-            a.textContent = file;
-            a.href = '#';
-            a.onclick = (e) => {
-                e.preventDefault();
-                loadCSV(project, file);
-            };
-            const deleteIcon = document.createElement('i');
-            deleteIcon.className = 'bi bi-trash text-secondary';
-            deleteIcon.style.cursor = 'pointer';
-            deleteIcon.onclick = (e) => {
-                e.stopPropagation();
-                deleteFile(project, file);
-            };
-            li.appendChild(a);
-            li.appendChild(deleteIcon);
-            filesContainer.appendChild(li);
-        });
-    })
-    .catch(error => console.error('Error:', error));
-}
+    function uploadCSV() {
+        const file = csvFile.files[0];
+        if (file && currentProject) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('project', currentProject);
+
+            fetch('/upload_csv', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.filename) {
+                    loadProjectFiles(currentProject);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        } else {
+            alert('Please select a project and a file to upload.');
+        }
+    }
+
+    function loadProjects() {
+        fetch('/get_projects')
+        .then(response => response.json())
+        .then(projects => {
+            projectSelect.innerHTML = '<option value="">Select Project</option>';
+            projectList.innerHTML = '';
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project;
+                option.textContent = project;
+                projectSelect.appendChild(option);
+
+                const li = document.createElement('li');
+                li.className = 'nav-item';
+                li.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a class="nav-link project-link" href="#" data-project="${project}">
+                            <i class="bi bi-chevron-right"></i> ${project}
+                        </a>
+                        <a href="/settings/${project}" class="btn btn-sm btn-outline-secondary me-2" title="Project Settings">
+                            <i class="bi bi-gear"></i>
+                        </a>
+                    </div>
+                    <ul class="nav flex-column project-files" style="display: none;"></ul>
+                `;
+                projectList.appendChild(li);
+            });
+
+            // Add event listeners to project links
+            document.querySelectorAll('.project-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const projectName = link.getAttribute('data-project');
+                    const filesContainer = link.parentElement.nextElementSibling;
+                    const chevron = link.querySelector('i');
+
+                    if (filesContainer.style.display === 'none') {
+                        loadProjectFiles(projectName, filesContainer);
+                        filesContainer.style.display = 'block';
+                        chevron.classList.replace('bi-chevron-right', 'bi-chevron-down');
+                    } else {
+                        filesContainer.style.display = 'none';
+                        chevron.classList.replace('bi-chevron-down', 'bi-chevron-right');
+                    }
+                });
+            });
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    function loadProjectFiles(project, container = null) {
+        fetch(`/get_project_files/${project}`)
+        .then(response => response.json())
+        .then(files => {
+            const filesContainer = container || document.querySelector(`[data-project="${project}"]`).parentElement.nextElementSibling;
+            filesContainer.innerHTML = '';
+            files.forEach(file => {
+                const li = document.createElement('li');
+                li.className = 'nav-item d-flex justify-content-between align-items-center';
+                const a = document.createElement('a');
+                a.className = 'nav-link csv-file';
+                a.textContent = file;
+                a.href = '#';
+                a.onclick = (e) => {
+                    e.preventDefault();
+                    loadCSV(project, file);
+                };
+                const deleteIcon = document.createElement('i');
+                deleteIcon.className = 'bi bi-trash text-secondary';
+                deleteIcon.style.cursor = 'pointer';
+                deleteIcon.onclick = (e) => {
+                    e.stopPropagation();
+                    deleteFile(project, file);
+                };
+                li.appendChild(a);
+                li.appendChild(deleteIcon);
+                filesContainer.appendChild(li);
+            });
+        })
+        .catch(error => console.error('Error:', error));
+    }
 
     function deleteFile(project, filename) {
         if (confirm(`Are you sure you want to delete ${filename} and its annotations?`)) {
