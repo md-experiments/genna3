@@ -1,0 +1,204 @@
+:root {
+    --bg-color: #f0f8ff;
+    --text-color: #333;
+    --navbar-bg: #295F98;
+    --sidebar-bg: #CDC2A5;
+    --table-header-bg: #295F98;
+    --table-header-color: white;
+    --table-row-even: #e6f3ff;
+    --table-row-odd: #ffffff;
+    --table-border: #87cefa;
+    --thumbs-inactive: #d3d3d3;
+    --thumbs-up-active: #28a745;
+    --thumbs-down-active: #dc3545;
+    --active-csv-bg: #295F98;
+    --active-csv-color: white;
+    --project-hover: rgba(0, 123, 255, 0.1);
+}
+
+.dark-mode {
+    --bg-color: #1a1a1a;
+    --text-color: #f0f0f0;
+    --navbar-bg: #2c2c2c;
+    --sidebar-bg: #333333;
+    --table-header-bg: #333333;
+    --table-header-color: #f0f0f0;
+    --table-row-even: #2c2c2c;
+    --table-row-odd: #3a3a3a;
+    --table-border: #4a4a4a;
+    --thumbs-inactive: #666666;
+    --thumbs-up-active: #1e7e34;
+    --thumbs-down-active: #a71d2a;
+    --active-csv-bg: #295F98;
+    --active-csv-color: #f0f0f0;
+    --project-hover: rgba(255, 255, 255, 0.1);
+}
+
+.table td {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+body {
+    font-size: .875rem;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+.navbar {
+    background-color: var(--navbar-bg) !important;
+}
+
+.navbar-brand, .navbar-nav .nav-link {
+    color: var(--text-color) !important;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    padding: 48px 0 0;
+    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+    background-color: var(--sidebar-bg);
+}
+
+.sidebar-sticky {
+    position: relative;
+    top: 0;
+    height: calc(100vh - 48px);
+    padding-top: .5rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.sidebar .nav-link {
+    font-weight: 500;
+    color: var(--text-color);
+    background-color: var(--sidebar-bg);
+}
+
+.sidebar .nav-link.active {
+    color: white;
+}
+
+main {
+    padding-top: 48px;
+}
+
+.navbar-brand {
+    padding-top: .75rem;
+    padding-bottom: .75rem;
+    font-size: 1rem;
+    background-color: rgba(0, 0, 0, .25);
+    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .25);
+}
+
+.table-responsive {
+    height: calc(100vh - 100px);
+    overflow-y: auto;
+}
+
+.table {
+    color: var(--text-color);
+}
+
+.table th {
+    background-color: var(--table-header-bg);
+    color: var(--table-header-color);
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: var(--table-row-odd);
+}
+
+.table-striped tbody tr:nth-of-type(even) {
+    background-color: var(--table-row-even);
+}
+
+.table td, .table th {
+    border-color: var(--table-border);
+}
+
+.thumbs {
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--thumbs-inactive);
+    transition: color 0.3s ease;
+    margin-right: 10px;
+}
+
+.thumbs-up.active {
+    color: var(--thumbs-up-active);
+}
+
+.thumbs-down.active {
+    color: var(--thumbs-down-active);
+}
+
+textarea {
+    width: 100%;
+    padding: 5px;
+    margin-top: 5px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border-color: var(--table-border);
+}
+
+.csv-file {
+    cursor: pointer;
+    padding: 5px 15px;
+    margin: 5px 0;
+    border-radius: 5px;
+}
+
+.csv-file:hover {
+    background-color: var(--project-hover);
+}
+
+.csv-file.active {
+    background-color: var(--active-csv-bg);
+    color: var(--active-csv-color);
+}
+
+@media (max-width: 767.98px) {
+    .sidebar {
+        top: 5rem;
+    }
+}
+
+.mode-switch {
+    cursor: pointer;
+}
+
+/* Ensure text is visible in both modes */
+.form-check-label {
+    color: var(--text-color);
+}
+
+/* Styles for project organization */
+.project-link {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.project-link:hover {
+    background-color: var(--project-hover);
+}
+
+.project-files {
+    padding-left: 20px;
+}
+
+.project-files .nav-link {
+    padding: 0.25rem 1rem;
+}
+
+.bi-chevron-right, .bi-chevron-down {
+    transition: transform 0.3s ease;
+}
+
+.project-link[aria-expanded="true"] .bi-chevron-right {
+    transform: rotate(90deg);
+}
