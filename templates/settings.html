@@ -7,6 +7,63 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .column-item {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 4px 8px;
+            margin: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .column-name {
+            margin: 0;
+            font-weight: 500;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .action-btn {
+            padding: 2px;
+            font-size: 1rem;
+            border: none;
+            background: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .action-btn.active.show { color: #0d6efd; }
+        .action-btn.active.label { color: #198754; }
+        .action-btn.active.content { color: #dc3545; }
+        .action-btn.active.filter { color: #6c757d; }
+        .columns-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: var(--bg-color);
+        }
+        .annotator-form {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .annotator-form > * {
+            margin: 0 !important;
+        }
+        .label-prompts {
+            margin-top: 8px;
+            padding: 8px;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
@@ -33,16 +90,38 @@
 
         <div class="card mt-4">
             <div class="card-body">
-                <h5 class="card-title">Category Columns</h5>
-                <p class="text-muted">These columns will be used for multi-filter functionality in the annotation view.</p>
+                <h5 class="card-title">Column Management</h5>
+                <p class="text-muted mb-2">Configure how each column is used in the annotation process.</p>
+                <div class="mb-2">
+                    <i class="bi bi-eye text-primary me-2"></i> Show
+                    <i class="bi bi-tag text-success me-2 ms-3"></i> Label
+                    <i class="bi bi-body-text text-danger me-2 ms-3"></i> Content
+                    <i class="bi bi-funnel text-secondary me-2 ms-3"></i> Filter
+                </div>
+                <div id="columnsContainer" class="columns-container">
+                    <!-- Columns will be added here dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">AI Annotators</h5>
+                <p class="text-muted">Configure AI models to assist with annotations.</p>
                 
-                <div id="categoryColumns" class="mb-3">
-                    <!-- Category columns will be added here dynamically -->
+                <div id="aiAnnotators" class="mb-3">
+                    <!-- AI annotators will be added here dynamically -->
                 </div>
 
-                <div class="input-group mb-3">
-                    <input type="text" id="newColumnInput" class="form-control" placeholder="New category column name">
-                    <button class="btn btn-outline-secondary" type="button" id="addColumnBtn">Add Column</button>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="annotator-form">
+                            <input type="text" id="newAnnotatorModel" class="form-control" placeholder="Model name (e.g., gpt-4)">
+                            <input type="number" id="newAnnotatorTemp" class="form-control" placeholder="Temperature" min="0" max="1" step="0.1" style="width: 120px;">
+                            <input type="text" id="newAnnotatorPrompt" class="form-control" placeholder="Base prompt template">
+                            <button class="btn btn-outline-secondary" type="button" id="addAnnotatorBtn">Add</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -57,9 +136,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             const modeSwitch = document.getElementById('modeSwitch');
             const projectObjective = document.getElementById('projectObjective');
-            const categoryColumns = document.getElementById('categoryColumns');
-            const newColumnInput = document.getElementById('newColumnInput');
-            const addColumnBtn = document.getElementById('addColumnBtn');
+            const columnsContainer = document.getElementById('columnsContainer');
+            const aiAnnotators = document.getElementById('aiAnnotators');
+            const addAnnotatorBtn = document.getElementById('addAnnotatorBtn');
             const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 
             // Check for saved mode preference
@@ -73,55 +152,172 @@
                 localStorage.setItem('darkMode', modeSwitch.checked);
             });
 
-            function createColumnElement(columnName) {
+            function createColumnElement(columnName, settings) {
                 const div = document.createElement('div');
-                div.className = 'input-group mb-2';
+                div.className = 'column-item';
                 div.innerHTML = `
-                    <input type="text" class="form-control category-column" value="${columnName}" readonly>
-                    <button class="btn btn-outline-danger delete-column" type="button">
-                        <i class="bi bi-trash"></i>
-                    </button>
+                    <div class="column-name">${columnName}</div>
+                    <div class="action-buttons">
+                        <button class="action-btn show ${settings.show ? 'active' : ''}" data-action="show" title="Show">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="action-btn label ${settings.label ? 'active' : ''}" data-action="label" title="Label">
+                            <i class="bi bi-tag"></i>
+                        </button>
+                        <button class="action-btn content ${settings.content ? 'active' : ''}" data-action="content" title="Content">
+                            <i class="bi bi-body-text"></i>
+                        </button>
+                        <button class="action-btn filter ${settings.filter ? 'active' : ''}" data-action="filter" title="Filter">
+                            <i class="bi bi-funnel"></i>
+                        </button>
+                    </div>
+                `;
+
+                // Add click handlers for action buttons
+                div.querySelectorAll('.action-btn').forEach(btn => {
+                    btn.onclick = function() {
+                        this.classList.toggle('active');
+                        updateAnnotatorPrompts();
+                    };
+                });
+
+                return div;
+            }
+
+            function createAnnotatorElement(annotator) {
+                const div = document.createElement('div');
+                div.className = 'card mb-3';
+                div.innerHTML = `
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="d-flex gap-3 align-items-center">
+                                <h6 class="card-title mb-0">${annotator.model_name}</h6>
+                                <small class="text-muted">Temperature: ${annotator.temperature}</small>
+                            </div>
+                            <button class="btn btn-outline-danger btn-sm delete-annotator">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-muted">Base Prompt:</small>
+                            <pre class="border rounded p-2 bg-light mb-2"><code>${annotator.prompt}</code></pre>
+                        </div>
+                        <div class="label-prompts">
+                            <!-- Label-specific prompts will be added here -->
+                        </div>
+                    </div>
                 `;
                 return div;
+            }
+
+            function updateAnnotatorPrompts() {
+                const labelColumns = Array.from(document.querySelectorAll('.action-btn.label.active'))
+                    .map(btn => btn.closest('.column-item').querySelector('.column-name').textContent);
+
+                document.querySelectorAll('.label-prompts').forEach(container => {
+                    container.innerHTML = labelColumns.map(col => `
+                        <div class="mb-2">
+                            <small class="text-muted">${col} Prompt:</small>
+                            <input type="text" class="form-control" placeholder="Prompt for ${col}" data-column="${col}">
+                        </div>
+                    `).join('');
+                });
             }
 
             function loadSettings() {
                 fetch(`/get_project_settings/{{ project }}`)
                     .then(response => response.json())
-                    .then(settings => {
+                    .then(data => {
+                        const settings = data.settings;
+                        const columns = data.columns;
+                        
                         projectObjective.value = settings.objective || '';
-                        categoryColumns.innerHTML = '';
-                        settings.category_columns.forEach(column => {
-                            categoryColumns.appendChild(createColumnElement(column));
+                        
+                        // Load columns
+                        columnsContainer.innerHTML = '';
+                        columns.forEach(column => {
+                            const columnSettings = settings.columns[column] || {
+                                show: true,
+                                label: false,
+                                content: false,
+                                filter: false
+                            };
+                            columnsContainer.appendChild(createColumnElement(column, columnSettings));
                         });
-                        addDeleteListeners();
+
+                        // Load AI annotators
+                        aiAnnotators.innerHTML = '';
+                        (settings.ai_annotators || []).forEach(annotator => {
+                            aiAnnotators.appendChild(createAnnotatorElement(annotator));
+                        });
+                        addAnnotatorDeleteListeners();
+                        updateAnnotatorPrompts();
                     });
             }
 
-            function addDeleteListeners() {
-                document.querySelectorAll('.delete-column').forEach(btn => {
+            function addAnnotatorDeleteListeners() {
+                document.querySelectorAll('.delete-annotator').forEach(btn => {
                     btn.onclick = function() {
-                        this.closest('.input-group').remove();
+                        this.closest('.card').remove();
                     };
                 });
             }
 
-            addColumnBtn.onclick = () => {
-                const columnName = newColumnInput.value.trim();
-                if (columnName) {
-                    categoryColumns.appendChild(createColumnElement(columnName));
-                    newColumnInput.value = '';
-                    addDeleteListeners();
+            addAnnotatorBtn.onclick = () => {
+                const model = document.getElementById('newAnnotatorModel').value.trim();
+                const temp = parseFloat(document.getElementById('newAnnotatorTemp').value);
+                const prompt = document.getElementById('newAnnotatorPrompt').value.trim();
+
+                if (model && !isNaN(temp) && temp >= 0 && temp <= 1 && prompt) {
+                    const annotator = {
+                        model_name: model,
+                        temperature: temp,
+                        prompt: prompt
+                    };
+                    aiAnnotators.appendChild(createAnnotatorElement(annotator));
+                    addAnnotatorDeleteListeners();
+                    updateAnnotatorPrompts();
+
+                    // Clear inputs
+                    document.getElementById('newAnnotatorModel').value = '';
+                    document.getElementById('newAnnotatorTemp').value = '';
+                    document.getElementById('newAnnotatorPrompt').value = '';
+                } else {
+                    alert('Please fill in all AI annotator fields correctly');
                 }
             };
 
             saveSettingsBtn.onclick = () => {
-                const columns = Array.from(document.querySelectorAll('.category-column'))
-                    .map(input => input.value);
+                const columnSettings = {};
+                columnsContainer.querySelectorAll('.column-item').forEach(item => {
+                    const columnName = item.querySelector('.column-name').textContent;
+                    columnSettings[columnName] = {
+                        show: item.querySelector('.show').classList.contains('active'),
+                        label: item.querySelector('.label').classList.contains('active'),
+                        content: item.querySelector('.content').classList.contains('active'),
+                        filter: item.querySelector('.filter').classList.contains('active')
+                    };
+                });
+
+                const annotators = Array.from(aiAnnotators.querySelectorAll('.card'))
+                    .map(card => {
+                        const labelPrompts = {};
+                        card.querySelectorAll('.label-prompts input').forEach(input => {
+                            labelPrompts[input.dataset.column] = input.value;
+                        });
+
+                        return {
+                            model_name: card.querySelector('.card-title').textContent,
+                            temperature: parseFloat(card.querySelector('.text-muted').textContent.split(': ')[1]),
+                            prompt: card.querySelector('code').textContent,
+                            label_prompts: labelPrompts
+                        };
+                    });
                 
                 const settings = {
                     objective: projectObjective.value,
-                    category_columns: columns
+                    columns: columnSettings,
+                    ai_annotators: annotators
                 };
 
                 fetch(`/save_project_settings/{{ project }}`, {

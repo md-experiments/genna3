@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const projectSelect = document.getElementById('projectSelect');
     const modeSwitch = document.getElementById('modeSwitch');
     const newProjectBtn = document.getElementById('newProjectBtn');
+    const aiAnnotationTemplate = document.getElementById('aiAnnotationTemplate');
 
     let currentProject = '';
     let currentCsvFilename = '';
@@ -14,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let categories = {};
     let columns = [];
     let activeFilters = {};
+    let aiAnnotators = [];
 
     uploadBtn.addEventListener('click', uploadCSV);
     modeSwitch.addEventListener('change', toggleDarkMode);
@@ -199,12 +201,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 originalData = data.data;
                 categories = data.categories;
                 columns = data.columns;
+                aiAnnotators = data.ai_annotators || [];
                 displayData(data.data);
                 createFilters();
                 loadAnnotations(project, filename);
                 highlightActiveCSV(filename);
             })
             .catch(error => console.error('Error:', error));
+    }
+
+    function createAIAnnotationCell() {
+        const container = document.createElement('div');
+        container.className = 'annotations-container';
+        return container;
     }
 
     function displayData(data) {
@@ -214,22 +223,32 @@ document.addEventListener('DOMContentLoaded', () => {
         // Create table header
         const thead = table.createTHead();
         const headerRow = thead.insertRow();
+        
+        // Add data columns
         columns.forEach(header => {
             const th = document.createElement('th');
             th.textContent = header;
             headerRow.appendChild(th);
         });
-        const annotationHeader = document.createElement('th');
-        annotationHeader.textContent = 'Annotation';
-        headerRow.appendChild(annotationHeader);
-        const commentHeader = document.createElement('th');
-        commentHeader.textContent = 'Comment';
-        headerRow.appendChild(commentHeader);
+
+        // Add manual annotation column
+        const manualHeader = document.createElement('th');
+        manualHeader.textContent = 'Manual Annotation';
+        headerRow.appendChild(manualHeader);
+
+        // Add AI annotations column
+        if (aiAnnotators.length > 0) {
+            const aiHeader = document.createElement('th');
+            aiHeader.textContent = 'AI Annotations';
+            headerRow.appendChild(aiHeader);
+        }
 
         // Create table body
         const tbody = table.createTBody();
         data.forEach((row, index) => {
             const tr = tbody.insertRow();
+            
+            // Add data columns
             columns.forEach(column => {
                 const td = tr.insertCell();
                 if (typeof row[column] === 'number') {
@@ -242,8 +261,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // Add annotation column
-            const annotationCell = tr.insertCell();
+            // Add manual annotation cell
+            const manualCell = tr.insertCell();
+            manualCell.className = 'manual-annotation';
+            
+            // Add thumbs up/down
+            const annotationDiv = document.createElement('div');
+            annotationDiv.className = 'd-flex align-items-center mb-2';
+            
             const thumbsUp = document.createElement('i');
             thumbsUp.className = 'bi bi-hand-thumbs-up thumbs thumbs-up';
             const thumbsDown = document.createElement('i');
@@ -260,19 +285,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveAnnotations();
             };
 
-            annotationCell.appendChild(thumbsUp);
-            annotationCell.appendChild(thumbsDown);
+            annotationDiv.appendChild(thumbsUp);
+            annotationDiv.appendChild(thumbsDown);
+            manualCell.appendChild(annotationDiv);
 
-            // Add comment column
-            const commentCell = tr.insertCell();
+            // Add comment textarea
             const textarea = document.createElement('textarea');
             textarea.className = 'form-control';
             textarea.rows = 1;
+            textarea.placeholder = 'Add a comment...';
             textarea.addEventListener('input', () => {
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(saveAnnotations, 500);
             });
-            commentCell.appendChild(textarea);
+            manualCell.appendChild(textarea);
+
+            // Add AI annotations cell if there are AI annotators
+            if (aiAnnotators.length > 0) {
+                const aiCell = tr.insertCell();
+                aiCell.appendChild(createAIAnnotationCell());
+            }
         });
 
         dataContainer.innerHTML = '';
@@ -281,22 +313,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function saveAnnotations() {
         const table = dataContainer.querySelector('table');
-        const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent);
         const rows = Array.from(table.querySelectorAll('tbody tr'));
 
-        const annotations = rows.map(row => {
+        const manualAnnotations = rows.map(row => {
             const cells = Array.from(row.querySelectorAll('td'));
             const rowData = {};
-            cells.slice(0, -2).forEach((cell, index) => {
-                rowData[headers[index]] = cell.textContent;
+            
+            // Get data from content columns
+            cells.slice(0, columns.length).forEach((cell, index) => {
+                rowData[columns[index]] = cell.textContent;
             });
             
-            const thumbsUp = cells[cells.length - 2].querySelector('.thumbs-up');
-            const thumbsDown = cells[cells.length - 2].querySelector('.thumbs-down');
-            rowData['Annotation'] = thumbsUp.classList.contains('active') ? 'thumbs_up' : 
-                                    (thumbsDown.classList.contains('active') ? 'thumbs_down' : 'none');
+            // Get manual annotation
+            const manualCell = cells[columns.length];
+            const thumbsUp = manualCell.querySelector('.thumbs-up');
+            const thumbsDown = manualCell.querySelector('.thumbs-down');
+            rowData['annotation'] = thumbsUp.classList.contains('active') ? 'thumbs_up' : 
+                                  (thumbsDown.classList.contains('active') ? 'thumbs_down' : 'none');
+            rowData['comment'] = manualCell.querySelector('textarea').value;
             
-            rowData['Comment'] = cells[cells.length - 1].querySelector('textarea').value;
             return rowData;
         });
 
@@ -308,7 +343,8 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({
                 project: currentProject,
                 csv_filename: currentCsvFilename,
-                annotations: annotations
+                manual_annotations: manualAnnotations,
+                ai_annotations: {} // Will be populated when AI annotations are implemented
             }),
         })
         .then(response => response.json())
@@ -319,35 +355,66 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadAnnotations(project, csvFilename) {
         fetch(`/load_annotations/${project}/${csvFilename}`)
         .then(response => response.json())
-        .then(annotations => {
-            if (annotations.length > 0) {
-                applyAnnotations(annotations);
+        .then(data => {
+            if (data.manual_annotations && data.manual_annotations.length > 0) {
+                applyManualAnnotations(data.manual_annotations);
+            }
+            if (data.ai_annotations) {
+                applyAIAnnotations(data.ai_annotations);
             }
         })
         .catch(error => console.error('Error:', error));
     }
 
-    function applyAnnotations(annotations) {
+    function applyManualAnnotations(annotations) {
         const table = dataContainer.querySelector('table');
         const rows = Array.from(table.querySelectorAll('tbody tr'));
 
         rows.forEach((row, index) => {
             const annotation = annotations[index];
             if (annotation) {
-                const thumbsUp = row.querySelector('.thumbs-up');
-                const thumbsDown = row.querySelector('.thumbs-down');
-                const textarea = row.querySelector('textarea');
+                const manualCell = row.cells[columns.length];
+                const thumbsUp = manualCell.querySelector('.thumbs-up');
+                const thumbsDown = manualCell.querySelector('.thumbs-down');
+                const textarea = manualCell.querySelector('textarea');
 
                 thumbsUp.classList.remove('active');
                 thumbsDown.classList.remove('active');
 
-                if (annotation.Annotation === 'thumbs_up') {
+                if (annotation.annotation === 'thumbs_up') {
                     thumbsUp.classList.add('active');
-                } else if (annotation.Annotation === 'thumbs_down') {
+                } else if (annotation.annotation === 'thumbs_down') {
                     thumbsDown.classList.add('active');
                 }
 
-                textarea.value = annotation.Comment || '';
+                textarea.value = annotation.comment || '';
+            }
+        });
+    }
+
+    function applyAIAnnotations(aiAnnotations) {
+        const table = dataContainer.querySelector('table');
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+
+        rows.forEach((row, index) => {
+            if (aiAnnotators.length > 0) {
+                const aiCell = row.cells[columns.length + 1];
+                const container = aiCell.querySelector('.annotations-container');
+                container.innerHTML = '';
+
+                aiAnnotators.forEach(annotator => {
+                    const annotations = aiAnnotations[annotator.model_name];
+                    if (annotations && annotations[index]) {
+                        const annotation = annotations[index];
+                        const element = aiAnnotationTemplate.content.cloneNode(true);
+                        
+                        element.querySelector('.model-name').textContent = annotator.model_name;
+                        element.querySelector('.temperature').textContent = `temp: ${annotator.temperature}`;
+                        element.querySelector('.ai-annotation-content').textContent = annotation;
+                        
+                        container.appendChild(element);
+                    }
+                });
             }
         });
     }

@@ -2,12 +2,12 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 import pandas as pd
 import json
 import os
+from collections import OrderedDict
 
 app = Flask(__name__)
 
 BASE_DIR = 'data'
 ANNOTATIONS_DIR = 'annotations'
-DEFAULT_CATEGORY_COLUMNS = ['section','significant_change', 'future_past','theme_category', 'company_impact']
 
 def get_project_settings(project_name):
     settings_file = os.path.join(BASE_DIR, project_name, 'project_settings.json')
@@ -15,9 +15,28 @@ def get_project_settings(project_name):
         with open(settings_file, 'r') as f:
             return json.load(f)
     return {
-        'category_columns': DEFAULT_CATEGORY_COLUMNS,
-        'objective': ''
+        'columns': {},
+        'objective': '',
+        'ai_annotators': []
     }
+
+def get_project_columns(project_name):
+    """Gather unique column names from all CSV files in the project, maintaining order."""
+    project_dir = os.path.join(BASE_DIR, project_name)
+    seen_columns = OrderedDict()
+    
+    if os.path.exists(project_dir):
+        for file in os.listdir(project_dir):
+            if file.endswith('.csv'):
+                file_path = os.path.join(project_dir, file)
+                try:
+                    df = pd.read_csv(file_path)
+                    for col in df.columns:
+                        seen_columns[col] = None
+                except Exception as e:
+                    print(f"Error reading {file}: {str(e)}")
+    
+    return list(seen_columns.keys())
 
 def save_project_settings(project_name, settings):
     settings_file = os.path.join(BASE_DIR, project_name, 'project_settings.json')
@@ -35,13 +54,35 @@ def project_settings(project):
 
 @app.route('/get_project_settings/<project>')
 def get_settings(project):
-    return jsonify(get_project_settings(project))
+    settings = get_project_settings(project)
+    columns = get_project_columns(project)
+    
+    # Initialize column settings if they don't exist
+    if 'columns' not in settings:
+        settings['columns'] = {}
+    
+    # Ensure all columns have settings
+    for col in columns:
+        if col not in settings['columns']:
+            settings['columns'][col] = {
+                'show': True,
+                'label': False,
+                'content': False,
+                'filter': False
+            }
+    
+    return jsonify({
+        'settings': settings,
+        'columns': columns
+    })
 
 @app.route('/save_project_settings/<project>', methods=['POST'])
 def save_settings(project):
     settings = request.json
     save_project_settings(project, settings)
     return jsonify({'success': True, 'message': 'Settings saved successfully'})
+
+# ... [rest of the routes remain unchanged]
 
 @app.route('/get_projects')
 def get_projects():
@@ -57,8 +98,9 @@ def create_project():
             os.makedirs(project_path)
             # Initialize default settings
             save_project_settings(project_name, {
-                'category_columns': DEFAULT_CATEGORY_COLUMNS,
-                'objective': ''
+                'columns': {},
+                'objective': '',
+                'ai_annotators': []
             })
             return jsonify({'success': True, 'message': 'Project created successfully'})
         else:
@@ -92,9 +134,26 @@ def load_csv(project, filename):
         data = df.to_dict(orient='records')
         columns = df.columns.tolist()
         settings = get_project_settings(project)
-        category_columns = settings['category_columns']
-        categories = {col: df[col].unique().tolist() for col in category_columns if col in df.columns}
-        return jsonify({'data': data, 'columns': columns, 'categories': categories})
+        
+        # Get visible and filter columns from settings
+        visible_columns = [col for col, conf in settings['columns'].items() if conf.get('show', True)]
+        filter_columns = [col for col, conf in settings['columns'].items() if conf.get('filter', False)]
+        
+        # Filter data to only include visible columns
+        filtered_data = []
+        for row in data:
+            filtered_row = {k: v for k, v in row.items() if k in visible_columns}
+            filtered_data.append(filtered_row)
+        
+        # Get categories for filter columns
+        categories = {col: df[col].unique().tolist() for col in filter_columns if col in df.columns}
+        
+        return jsonify({
+            'data': filtered_data,
+            'columns': visible_columns,
+            'categories': categories,
+            'ai_annotators': settings.get('ai_annotators', [])
+        })
     return jsonify({'error': 'File not found'})
 
 @app.route('/save_annotations', methods=['POST'])
@@ -103,22 +162,53 @@ def save_annotations():
     project = data['project']
     csv_filename = data['csv_filename']
     annotations = data['annotations']
+    
+    annotation_data = {
+        'manual_annotations': annotations,
+        'ai_annotations': data.get('ai_annotations', {}),
+        'metadata': {
+            'last_updated': pd.Timestamp.now().isoformat(),
+            'version': '2.0'
+        }
+    }
+    
     annotation_filename = f"{os.path.splitext(csv_filename)[0]}_annotations.json"
     project_annotations_dir = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR)
     os.makedirs(project_annotations_dir, exist_ok=True)
+    
     with open(os.path.join(project_annotations_dir, annotation_filename), 'w') as f:
-        json.dump(annotations, f)
+        json.dump(annotation_data, f)
+    
     return jsonify({'message': 'Annotations saved successfully'})
 
 @app.route('/load_annotations/<project>/<csv_filename>')
 def load_annotations(project, csv_filename):
     annotation_filename = f"{os.path.splitext(csv_filename)[0]}_annotations.json"
     file_path = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, annotation_filename)
+    
     if os.path.exists(file_path):
         with open(file_path, 'r') as f:
-            annotations = json.load(f)
-        return jsonify(annotations)
-    return jsonify([])
+            annotation_data = json.load(f)
+            
+        if isinstance(annotation_data, list):  # Old format
+            return jsonify({
+                'manual_annotations': annotation_data,
+                'ai_annotations': {},
+                'metadata': {
+                    'last_updated': pd.Timestamp.now().isoformat(),
+                    'version': '2.0'
+                }
+            })
+        return jsonify(annotation_data)
+    
+    return jsonify({
+        'manual_annotations': [],
+        'ai_annotations': {},
+        'metadata': {
+            'last_updated': pd.Timestamp.now().isoformat(),
+            'version': '2.0'
+        }
+    })
 
 @app.route('/delete_file', methods=['POST'])
 def delete_file():
