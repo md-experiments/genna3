@@ -2,12 +2,19 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 import pandas as pd
 import json
 import os
+import yaml
 from collections import OrderedDict
 
 app = Flask(__name__)
 
 BASE_DIR = 'data'
 ANNOTATIONS_DIR = 'annotations'
+
+def load_llm_models():
+    """Load available LLM models from yaml file."""
+    with open('llm_models.yaml', 'r') as f:
+        models = yaml.safe_load(f)
+    return list(models.keys())
 
 def get_project_settings(project_name):
     settings_file = os.path.join(BASE_DIR, project_name, 'project_settings.json')
@@ -56,6 +63,7 @@ def project_settings(project):
 def get_settings(project):
     settings = get_project_settings(project)
     columns = get_project_columns(project)
+    models = load_llm_models()
     
     # Initialize column settings if they don't exist
     if 'columns' not in settings:
@@ -68,12 +76,14 @@ def get_settings(project):
                 'show': True,
                 'label': False,
                 'content': False,
-                'filter': False
+                'filter': False,
+                'label_type': 'text'  # Default type for labels
             }
     
     return jsonify({
         'settings': settings,
-        'columns': columns
+        'columns': columns,
+        'available_models': models
     })
 
 @app.route('/save_project_settings/<project>', methods=['POST'])
@@ -81,8 +91,6 @@ def save_settings(project):
     settings = request.json
     save_project_settings(project, settings)
     return jsonify({'success': True, 'message': 'Settings saved successfully'})
-
-# ... [rest of the routes remain unchanged]
 
 @app.route('/get_projects')
 def get_projects():
@@ -227,7 +235,6 @@ def delete_file():
         return jsonify({'success': True, 'message': 'File and annotations deleted successfully'})
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error deleting file: {str(e)}'})
-
 if __name__ == '__main__':
     os.makedirs(BASE_DIR, exist_ok=True)
     app.run(debug=True, port=5001)

@@ -38,7 +38,7 @@
         .action-btn.active.show { color: #0d6efd; }
         .action-btn.active.label { color: #198754; }
         .action-btn.active.content { color: #dc3545; }
-        .action-btn.active.filter { color: #6c757d; }
+        .action-btn.active.filter { color: #ffc107; }
         .columns-container {
             display: flex;
             flex-wrap: wrap;
@@ -48,22 +48,109 @@
             border-radius: 4px;
             background-color: var(--bg-color);
         }
-        .annotator-form {
-            display: flex;
-            gap: 8px;
-            align-items: center;
+    .annotator-form {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .annotator-form-row {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+    }
+
+    .model-prompt {
+        width: 100%;
+        min-height: 60px;
+        resize: vertical;
+    }
+    .ai-models-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
         }
-        .annotator-form > * {
-            margin: 0 !important;
-        }
-        .label-prompts {
-            margin-top: 8px;
-            padding: 8px;
-            background-color: var(--bg-color);
+        .model-list {
             border: 1px solid var(--border-color);
             border-radius: 4px;
+            padding: 12px;
         }
-    </style>
+    .model-item {
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 4px;
+        margin-bottom: 4px;
+        background-color: var(--bg-color);
+        border: 1px solid var(--border-color);
+        width: 100%;
+        word-wrap: break-word;
+    }
+
+    .model-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .model-header-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .model-name-labels {
+        font-weight: 500;
+        word-break: break-word;
+    }
+
+    .model-labels {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+    .annotator-form input[type="text"],
+    .annotator-form textarea {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .form-control {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .model-details pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-width: 100%;
+    }
+
+    .model-list {
+        min-width: 0;  /* Allow column to shrink */
+    }
+    .role-checkboxes {
+            display: flex;
+            gap: 16px;
+            margin-right: 16px;
+        }
+        .label-type-select {
+            font-size: 0.875rem;
+            padding: 2px 4px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            width: 100px;
+    }
+    .label-config {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+    .label-config small {
+        min-width: 100px;
+    }
+</style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
@@ -106,40 +193,75 @@
 
         <div class="card mt-4">
             <div class="card-body">
-                <h5 class="card-title">AI Annotators</h5>
-                <p class="text-muted">Configure AI models to assist with annotations.</p>
-                
-                <div id="aiAnnotators" class="mb-3">
-                    <!-- AI annotators will be added here dynamically -->
-                </div>
+                <h5 class="card-title">AI Models</h5>
+                <p class="text-muted">Configure AI models for annotation and judgment.</p>
 
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <div class="annotator-form">
-                            <input type="text" id="newAnnotatorModel" class="form-control" placeholder="Model name (e.g., gpt-4)">
-                            <input type="number" id="newAnnotatorTemp" class="form-control" placeholder="Temperature" min="0" max="1" step="0.1" style="width: 120px;">
-                            <input type="text" id="newAnnotatorPrompt" class="form-control" placeholder="Base prompt template">
-                            <button class="btn btn-outline-secondary" type="button" id="addAnnotatorBtn">Add</button>
+                <div class="ai-models-container mb-4">
+                    <div class="model-list">
+                        <h6 class="mb-3">Annotators</h6>
+                        <div id="annotatorsList">
+                            <!-- Annotators will be added here -->
+                        </div>
+                    </div>
+                    <div class="model-list">
+                        <h6 class="mb-3">Judges</h6>
+                        <div id="judgesList">
+                            <!-- Judges will be added here -->
                         </div>
                     </div>
                 </div>
+
+    <div class="card">
+    <div class="card-body">
+        <h6 class="mb-3">Add New Model</h6>
+        <div class="annotator-form mb-3">
+            <div class="annotator-form-row">
+                <select id="newAnnotatorModel" class="form-control" style="width: auto;">
+                    <option value="">Select Model</option>
+                    <!-- Models will be loaded here -->
+                </select>
+                <input type="number" id="newAnnotatorTemp" class="form-control" placeholder="Temperature" min="0" max="1" step="0.1" style="width: 120px;">
+            </div>
+            <textarea id="newAnnotatorPrompt" class="form-control model-prompt" placeholder="Base prompt template"></textarea>
+        </div>
+        <div class="role-checkboxes mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="isAnnotator">
+                <label class="form-check-label" for="isAnnotator">Annotator</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="isJudge">
+                <label class="form-check-label" for="isJudge">Judge</label>
             </div>
         </div>
-
-        <div class="mt-4 mb-4">
+        <div id="labelConfigs">
+            <!-- Label configurations will be added here -->
+        </div>
+        <button class="btn btn-outline-secondary" type="button" id="addAnnotatorBtn">Add Model</button>
+    </div>
+</div>
+<div class="mt-4 mb-4">
             <button id="saveSettingsBtn" class="btn btn-primary">Save Settings</button>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+    // Previous JavaScript remains unchanged until createModelElement function
+    document.addEventListener('DOMContentLoaded', () => {
             const modeSwitch = document.getElementById('modeSwitch');
             const projectObjective = document.getElementById('projectObjective');
             const columnsContainer = document.getElementById('columnsContainer');
-            const aiAnnotators = document.getElementById('aiAnnotators');
+            const annotatorsList = document.getElementById('annotatorsList');
+            const judgesList = document.getElementById('judgesList');
+            const isAnnotator = document.getElementById('isAnnotator');
+            const isJudge = document.getElementById('isJudge');
             const addAnnotatorBtn = document.getElementById('addAnnotatorBtn');
             const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+            const newAnnotatorLabelPrompts = document.getElementById('newAnnotatorLabelPrompts');
+
+            let availableModels = [];
+            let lastModelSettings = null;
 
             // Check for saved mode preference
             if (localStorage.getItem('darkMode') === 'true') {
@@ -152,194 +274,316 @@
                 localStorage.setItem('darkMode', modeSwitch.checked);
             });
 
-            function createColumnElement(columnName, settings) {
-                const div = document.createElement('div');
-                div.className = 'column-item';
-                div.innerHTML = `
-                    <div class="column-name">${columnName}</div>
-                    <div class="action-buttons">
-                        <button class="action-btn show ${settings.show ? 'active' : ''}" data-action="show" title="Show">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                        <button class="action-btn label ${settings.label ? 'active' : ''}" data-action="label" title="Label">
-                            <i class="bi bi-tag"></i>
-                        </button>
-                        <button class="action-btn content ${settings.content ? 'active' : ''}" data-action="content" title="Content">
-                            <i class="bi bi-body-text"></i>
-                        </button>
-                        <button class="action-btn filter ${settings.filter ? 'active' : ''}" data-action="filter" title="Filter">
-                            <i class="bi bi-funnel"></i>
-                        </button>
+        function createColumnElement(columnName, settings) {
+            const div = document.createElement('div');
+            div.className = 'column-item';
+            div.innerHTML = `
+                <div class="column-name">${columnName}</div>
+                <div class="action-buttons">
+                    <button class="action-btn show ${settings.show ? 'active' : ''}" data-action="show" title="Show">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="action-btn label ${settings.label ? 'active' : ''}" data-action="label" title="Label">
+                        <i class="bi bi-tag"></i>
+                    </button>
+                    <button class="action-btn content ${settings.content ? 'active' : ''}" data-action="content" title="Content">
+                        <i class="bi bi-body-text"></i>
+                    </button>
+                    <button class="action-btn filter ${settings.filter ? 'active' : ''}" data-action="filter" title="Filter">
+                        <i class="bi bi-funnel"></i>
+                    </button>
+                </div>
+            `;
+
+            // Add click handlers for action buttons
+            div.querySelectorAll('.action-btn').forEach(btn => {
+                btn.onclick = function() {
+                    this.classList.toggle('active');
+                    if (btn.classList.contains('label')) {
+                        updateLabelConfigs();
+                    }
+                };
+            });
+
+            return div;
+        }
+
+        function updateLabelConfigs() {
+            const labelColumns = Array.from(document.querySelectorAll('.action-btn.label.active'))
+                .map(btn => btn.closest('.column-item').querySelector('.column-name').textContent);
+
+            const labelConfigs = document.getElementById('labelConfigs');
+            labelConfigs.innerHTML = labelColumns.map(column => {
+                const savedType = lastModelSettings?.label_types?.[column] || 'text';
+                const savedPrompt = lastModelSettings?.label_prompts?.[column] || '';
+                
+                return `
+                    <div class="label-config">
+                        <small class="text-muted">${column}:</small>
+                        <select class="label-type-select" data-column="${column}">
+                            <option value="text" ${savedType === 'text' ? 'selected' : ''}>Text</option>
+                            <option value="bool" ${savedType === 'bool' ? 'selected' : ''}>Bool</option>
+                            <option value="number" ${savedType === 'number' ? 'selected' : ''}>Number</option>
+                        </select>
+                        <input type="text" class="form-control" placeholder="Prompt for ${column}" 
+                               data-column="${column}" value="${savedPrompt}">
                     </div>
                 `;
+            }).join('');
+        }
 
-                // Add click handlers for action buttons
-                div.querySelectorAll('.action-btn').forEach(btn => {
-                    btn.onclick = function() {
-                        this.classList.toggle('active');
-                        updateAnnotatorPrompts();
-                    };
-                });
-
-                return div;
-            }
-
-            function createAnnotatorElement(annotator) {
-                const div = document.createElement('div');
-                div.className = 'card mb-3';
-                div.innerHTML = `
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div class="d-flex gap-3 align-items-center">
-                                <h6 class="card-title mb-0">${annotator.model_name}</h6>
-                                <small class="text-muted">Temperature: ${annotator.temperature}</small>
-                            </div>
-                            <button class="btn btn-outline-danger btn-sm delete-annotator">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                        <div class="mb-2">
-                            <small class="text-muted">Base Prompt:</small>
-                            <pre class="border rounded p-2 bg-light mb-2"><code>${annotator.prompt}</code></pre>
-                        </div>
-                        <div class="label-prompts">
-                            <!-- Label-specific prompts will be added here -->
-                        </div>
+    function createModelElement(model) {
+        // Get list of labels with their types
+        const labels = Object.entries(model.label_types || {})
+            .map(([column, type]) => `${column} (${type})`)
+            .join(', ');
+        
+        const div = document.createElement('div');
+        div.className = 'model-item';
+        div.innerHTML = `
+            <div class="model-header">
+                <div class="model-header-left">
+                    <div class="model-name-labels">
+                        ${model.model_name}
+                        ${labels ? `<br><small class="text-muted">${labels}</small>` : ''}
                     </div>
-                `;
-                return div;
-            }
+                    <small class="text-muted">temp: ${model.temperature}</small>
+                </div>
+            </div>
+            <div class="model-details" style="display: none;">
+                <div class="mb-2">
+                    <small class="text-muted">Base Prompt:</small>
+                    <pre class="border rounded p-2 bg-light mb-2"><code>${model.prompt}</code></pre>
+                </div>
+                ${Object.entries(model.label_prompts || {}).map(([column, prompt]) => `
+                    <div class="mb-2">
+                        <small class="text-muted">${column} (${model.label_types[column]}):</small>
+                        <pre class="border rounded p-2 bg-light mb-1"><code>${prompt}</code></pre>
+                    </div>
+                `).join('')}
+            </div>
+        `;
 
-            function updateAnnotatorPrompts() {
-                const labelColumns = Array.from(document.querySelectorAll('.action-btn.label.active'))
-                    .map(btn => btn.closest('.column-item').querySelector('.column-name').textContent);
+        div.querySelector('.model-header').addEventListener('click', () => {
+            const details = div.querySelector('.model-details');
+            details.style.display = details.style.display === 'none' ? 'block' : 'none';
+        });
 
-                document.querySelectorAll('.label-prompts').forEach(container => {
-                    container.innerHTML = labelColumns.map(col => `
-                        <div class="mb-2">
-                            <small class="text-muted">${col} Prompt:</small>
-                            <input type="text" class="form-control" placeholder="Prompt for ${col}" data-column="${col}">
-                        </div>
-                    `).join('');
-                });
-            }
-
-            function loadSettings() {
-                fetch(`/get_project_settings/{{ project }}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const settings = data.settings;
-                        const columns = data.columns;
-                        
-                        projectObjective.value = settings.objective || '';
-                        
-                        // Load columns
-                        columnsContainer.innerHTML = '';
-                        columns.forEach(column => {
-                            const columnSettings = settings.columns[column] || {
-                                show: true,
-                                label: false,
-                                content: false,
-                                filter: false
-                            };
-                            columnsContainer.appendChild(createColumnElement(column, columnSettings));
-                        });
-
-                        // Load AI annotators
-                        aiAnnotators.innerHTML = '';
-                        (settings.ai_annotators || []).forEach(annotator => {
-                            aiAnnotators.appendChild(createAnnotatorElement(annotator));
-                        });
-                        addAnnotatorDeleteListeners();
-                        updateAnnotatorPrompts();
-                    });
-            }
-
-            function addAnnotatorDeleteListeners() {
-                document.querySelectorAll('.delete-annotator').forEach(btn => {
-                    btn.onclick = function() {
-                        this.closest('.card').remove();
-                    };
-                });
-            }
-
-            addAnnotatorBtn.onclick = () => {
+        return div;
+    }
+    function validateAnnotatorFields() {
                 const model = document.getElementById('newAnnotatorModel').value.trim();
                 const temp = parseFloat(document.getElementById('newAnnotatorTemp').value);
                 const prompt = document.getElementById('newAnnotatorPrompt').value.trim();
+                const hasRole = isAnnotator.checked || isJudge.checked;
 
-                if (model && !isNaN(temp) && temp >= 0 && temp <= 1 && prompt) {
-                    const annotator = {
-                        model_name: model,
-                        temperature: temp,
-                        prompt: prompt
-                    };
-                    aiAnnotators.appendChild(createAnnotatorElement(annotator));
-                    addAnnotatorDeleteListeners();
-                    updateAnnotatorPrompts();
-
-                    // Clear inputs
-                    document.getElementById('newAnnotatorModel').value = '';
-                    document.getElementById('newAnnotatorTemp').value = '';
-                    document.getElementById('newAnnotatorPrompt').value = '';
-                } else {
-                    alert('Please fill in all AI annotator fields correctly');
+                if (!model) {
+                    alert('Please select a model');
+                    return false;
                 }
-            };
+                if (isNaN(temp) || temp < 0 || temp > 1) {
+                    alert('Temperature must be between 0 and 1');
+                    return false;
+                }
+                if (!prompt) {
+                    alert('Please enter a base prompt');
+                    return false;
+                }
+                if (!hasRole) {
+                    alert('Please select at least one role (Annotator or Judge)');
+                    return false;
+                }
 
-            saveSettingsBtn.onclick = () => {
-                const columnSettings = {};
-                columnsContainer.querySelectorAll('.column-item').forEach(item => {
-                    const columnName = item.querySelector('.column-name').textContent;
-                    columnSettings[columnName] = {
-                        show: item.querySelector('.show').classList.contains('active'),
-                        label: item.querySelector('.label').classList.contains('active'),
-                        content: item.querySelector('.content').classList.contains('active'),
-                        filter: item.querySelector('.filter').classList.contains('active')
-                    };
-                });
-
-                const annotators = Array.from(aiAnnotators.querySelectorAll('.card'))
-                    .map(card => {
-                        const labelPrompts = {};
-                        card.querySelectorAll('.label-prompts input').forEach(input => {
-                            labelPrompts[input.dataset.column] = input.value;
-                        });
-
-                        return {
-                            model_name: card.querySelector('.card-title').textContent,
-                            temperature: parseFloat(card.querySelector('.text-muted').textContent.split(': ')[1]),
-                            prompt: card.querySelector('code').textContent,
-                            label_prompts: labelPrompts
-                        };
+                // Validate label prompts
+                const labelInputs = document.querySelectorAll('#labelConfigs input');
+                if (labelInputs.length > 0) {
+                    let allPromptsValid = true;
+                    labelInputs.forEach(input => {
+                        if (!input.value.trim()) {
+                            alert(`Please enter a prompt for ${input.dataset.column}`);
+                            allPromptsValid = false;
+                        }
                     });
-                
-                const settings = {
-                    objective: projectObjective.value,
-                    columns: columnSettings,
-                    ai_annotators: annotators
+                    if (!allPromptsValid) return false;
+                }
+
+                return true;
+            }
+
+            addAnnotatorBtn.onclick = () => {
+                if (!validateAnnotatorFields()) return;
+
+                const model = {
+                    model_name: document.getElementById('newAnnotatorModel').value,
+                    temperature: parseFloat(document.getElementById('newAnnotatorTemp').value),
+                    prompt: document.getElementById('newAnnotatorPrompt').value.trim(),
+                    label_prompts: {},
+                    label_types: {}
                 };
 
-                fetch(`/save_project_settings/{{ project }}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(settings)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Settings saved successfully!');
-                    } else {
-                        alert('Error saving settings');
-                    }
+                // Collect label configurations
+                document.querySelectorAll('#labelConfigs .label-config').forEach(config => {
+                    const column = config.querySelector('input').dataset.column;
+                    model.label_prompts[column] = config.querySelector('input').value.trim();
+                    model.label_types[column] = config.querySelector('select').value;
                 });
+
+                // Save as last model settings
+                lastModelSettings = {
+                    model_name: model.model_name,
+                    temperature: model.temperature,
+                    prompt: model.prompt,
+                    label_prompts: {...model.label_prompts},
+                    label_types: {...model.label_types}
+                };
+
+                const modelElement = createModelElement(model);
+
+                if (isAnnotator.checked) {
+                    annotatorsList.appendChild(modelElement.cloneNode(true));
+                }
+                if (isJudge.checked) {
+                    judgesList.appendChild(modelElement.cloneNode(true));
+                }
+
+                // Clear role checkboxes only
+                isAnnotator.checked = false;
+                isJudge.checked = false;
+
+                // Prepopulate for next model
+                document.getElementById('newAnnotatorModel').value = model.model_name;
+                document.getElementById('newAnnotatorTemp').value = model.temperature;
+                document.getElementById('newAnnotatorPrompt').value = model.prompt;
             };
 
-            // Load initial settings
-            loadSettings();
-        });
-    </script>
+            function extractModelData(item) {
+                const labelTypes = {};
+                const labelPrompts = {};
+                
+                Array.from(item.querySelectorAll('.model-details pre')).slice(1).forEach(pre => {
+                    const header = pre.previousElementSibling.textContent;
+                    const match = header.match(/(.*?)\s*\((.*?)\):/);
+                    if (match) {
+                        const [_, column, type] = match;
+                        labelTypes[column] = type;
+                        labelPrompts[column] = pre.querySelector('code').textContent;
+                    }
+                });
+
+                return {
+                    model_name: item.querySelector('.model-name').textContent,
+                    temperature: parseFloat(item.querySelector('.text-muted').textContent.split(': ')[1]),
+                    prompt: item.querySelector('code').textContent,
+                    label_prompts: labelPrompts,
+                    label_types: labelTypes
+                };
+            }
+
+
+        saveSettingsBtn.onclick = () => {
+            const columnSettings = {};
+            columnsContainer.querySelectorAll('.column-item').forEach(item => {
+                const columnName = item.querySelector('.column-name').textContent;
+                columnSettings[columnName] = {
+                    show: item.querySelector('.show').classList.contains('active'),
+                    label: item.querySelector('.label').classList.contains('active'),
+                    content: item.querySelector('.content').classList.contains('active'),
+                    filter: item.querySelector('.filter').classList.contains('active')
+                };
+            });
+
+            const annotators = Array.from(annotatorsList.querySelectorAll('.model-item'))
+                .map(item => ({
+                    ...extractModelData(item),
+                    roles: ['annotator']
+                }));
+
+            const judges = Array.from(judgesList.querySelectorAll('.model-item'))
+                .map(item => ({
+                    ...extractModelData(item),
+                    roles: ['judge']
+                }));
+
+            const settings = {
+                objective: projectObjective.value,
+                columns: columnSettings,
+                ai_annotators: [...annotators, ...judges]
+            };
+
+            fetch(`/save_project_settings/{{ project }}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Settings saved successfully!');
+                } else {
+                    alert('Error saving settings');
+                }
+            });
+        };
+
+        function loadSettings() {
+            fetch(`/get_project_settings/{{ project }}`)
+                .then(response => response.json())
+                .then(data => {
+                    const settings = data.settings;
+                    const columns = data.columns;
+                    availableModels = data.available_models;
+                    
+                    projectObjective.value = settings.objective || '';
+                    
+                    // Load model options
+                    const modelSelect = document.getElementById('newAnnotatorModel');
+                    modelSelect.innerHTML = '<option value="">Select Model</option>' +
+                        availableModels.map(model => `<option value="${model}">${model}</option>`).join('');
+                    
+                    // Load columns
+                    columnsContainer.innerHTML = '';
+                    columns.forEach(column => {
+                        const columnSettings = settings.columns[column] || {
+                            show: true,
+                            label: false,
+                            content: false,
+                            filter: false
+                        };
+                        columnsContainer.appendChild(createColumnElement(column, columnSettings));
+                    });
+
+                    // Load AI models
+                    annotatorsList.innerHTML = '';
+                    judgesList.innerHTML = '';
+                    const models = settings.ai_annotators || [];
+                    models.forEach(model => {
+                        if (model.roles?.includes('annotator')) {
+                            annotatorsList.appendChild(createModelElement(model));
+                        }
+                        if (model.roles?.includes('judge')) {
+                            judgesList.appendChild(createModelElement(model));
+                        }
+                    });
+
+                    // Set last model settings if any models exist
+                    if (models.length > 0) {
+                        lastModelSettings = models[models.length - 1];
+                        // Prepopulate form with last model settings
+                        document.getElementById('newAnnotatorModel').value = lastModelSettings.model_name;
+                        document.getElementById('newAnnotatorTemp').value = lastModelSettings.temperature;
+                        document.getElementById('newAnnotatorPrompt').value = lastModelSettings.prompt;
+                    }
+
+                    // Update label configs based on active label columns
+                    updateLabelConfigs();
+                });
+        }
+
+        // Load initial settings
+        loadSettings();
+    });
+</script>
 </body>
 </html>

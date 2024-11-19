@@ -1,0 +1,9 @@
+gpt-4o-mini:
+  model_name: gpt-4o-mini
+  api_key_var: OPENAI_API_KEY
+haiku3:
+  model_name: claude-3-haiku-20240307
+  api_key_var: ANTHROPIC_API_KEY
+gwen05bn:
+  model_name: qwen2.5:0.5b
+  url: localhost:11434
