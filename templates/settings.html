@@ -150,6 +150,51 @@
     .label-config small {
         min-width: 100px;
     }
+    .model-scores {
+        display: flex;
+        gap: 8px;
+        margin-top: 4px;
+        flex-wrap: wrap;
+    }
+    .score-item {
+        font-size: 0.875rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background-color: var(--bg-color);
+        border: 1px solid var(--border-color);
+    }
+    .progress-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+    .progress-container {
+        background: var(--bg-color);
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        min-width: 300px;
+    }
+    .progress-spinner {
+        width: 50px;
+        height: 50px;
+        margin: 20px auto;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
 </style>
 </head>
 <body>
@@ -245,8 +290,17 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
+    
+<!-- Add progress overlay -->
+<div class="progress-overlay" id="progressOverlay">
+    <div class="progress-container">
+        <h5>Annotating...</h5>
+        <div class="progress-spinner"></div>
+        <p id="progressStatus">Processing...</p>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
     // Previous JavaScript remains unchanged until createModelElement function
     document.addEventListener('DOMContentLoaded', () => {
             const modeSwitch = document.getElementById('modeSwitch');
@@ -340,6 +394,7 @@ function createModelElement(model) {
     
     const div = document.createElement('div');
     div.className = 'model-item';
+    div.setAttribute('data-model-name', model.model_name);
     div.innerHTML = `
         <div class="model-header">
             <div class="model-header-left">
@@ -347,7 +402,11 @@ function createModelElement(model) {
                     ${model.model_name}
                     ${labels ? `<br><small class="text-muted">(${labels}) temp: ${model.temperature}</small>` : ''}
                 </div>
+                <div class="model-scores">
+                    <!-- Scores will be added here -->
+                </div>
             </div>
+            <button class="btn btn-sm btn-primary annotate-btn">Annotate</button>
         </div>
         <div class="model-details" style="display: none;">
             <div class="mb-2">
@@ -363,16 +422,115 @@ function createModelElement(model) {
         </div>
     `;
 
-    div.querySelector('.model-header').addEventListener('click', () => {
+    // Add click handler for model header (excluding the annotate button)
+    div.querySelector('.model-header-left').addEventListener('click', () => {
         const details = div.querySelector('.model-details');
         details.style.display = details.style.display === 'none' ? 'block' : 'none';
     });
 
+    // Add click handler for annotate button
+    div.querySelector('.annotate-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        startAnnotation(model, div);
+    });
+
+    // Load scores for this model
+    loadModelScores(model, div);
+
     return div;
 }
 
-<!-- Previous code remains unchanged until saveSettings function -->
-function validateAnnotatorFields() {
+function startAnnotation(model, element) {
+    const progressOverlay = document.getElementById('progressOverlay');
+    const progressStatus = document.getElementById('progressStatus');
+    progressOverlay.style.display = 'flex';
+    progressStatus.textContent = 'Starting annotation...';
+
+    // Start the annotation process
+    fetch(`/annotate/{{ project }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(model)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Start polling for progress
+            pollAnnotationProgress(model, element);
+        } else {
+            progressStatus.textContent = 'Error starting annotation';
+            setTimeout(() => {
+                progressOverlay.style.display = 'none';
+            }, 1500);
+        }
+    })
+    .catch(error => {
+        progressStatus.textContent = 'Error during annotation';
+        setTimeout(() => {
+            progressOverlay.style.display = 'none';
+        }, 1500);
+    });
+}
+
+function pollAnnotationProgress(model, element) {
+    const progressStatus = document.getElementById('progressStatus');
+    const progressOverlay = document.getElementById('progressOverlay');
+
+    function checkProgress() {
+        fetch(`/annotation_status/{{ project }}/${encodeURIComponent(model.annotator_id)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'completed') {
+                    progressStatus.textContent = 'Annotation completed successfully!';
+                    setTimeout(() => {
+                        progressOverlay.style.display = 'none';
+                        // Reload scores after completion
+                        loadModelScores(model, element);
+                    }, 1500);
+                } else if (data.status === 'error') {
+                    progressStatus.textContent = 'Error during annotation';
+                    setTimeout(() => {
+                        progressOverlay.style.display = 'none';
+                    }, 1500);
+                } else {
+                    // Update progress message
+                    progressStatus.textContent = data.message || 'Processing...';
+                    // Continue polling
+                    setTimeout(checkProgress, 1000);
+                }
+            })
+            .catch(error => {
+                progressStatus.textContent = 'Error checking progress';
+                setTimeout(() => {
+                    progressOverlay.style.display = 'none';
+                }, 1500);
+            });
+    }
+
+    // Start polling
+    checkProgress();
+}
+
+function loadModelScores(model, element) {
+        fetch(`/scores/{{ project }}/${encodeURIComponent(model.model_name)}`)
+            .then(response => response.json())
+            .then(scores => {
+                const scoresContainer = element.querySelector('.model-scores');
+                scoresContainer.innerHTML = Object.entries(scores)
+                    .map(([metric, value]) => `
+                        <span class="score-item">
+                            ${metric}: ${typeof value === 'number' ? value.toFixed(2) : value}
+                        </span>
+                    `).join('');
+            })
+            .catch(error => {
+                console.error('Error loading scores:', error);
+            });
+    }
+
+    function validateAnnotatorFields() {
                 const model = document.getElementById('newAnnotatorModel').value.trim();
                 const temp = parseFloat(document.getElementById('newAnnotatorTemp').value);
                 const prompt = document.getElementById('newAnnotatorPrompt').value.trim();

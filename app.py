@@ -49,7 +49,7 @@ def save_project_settings(project_name, settings):
     settings_file = os.path.join(BASE_DIR, project_name, 'project_settings.json')
     os.makedirs(os.path.dirname(settings_file), exist_ok=True)
     with open(settings_file, 'w') as f:
-        json.dump(settings, f)
+        json.dump(settings, f, indent=2)
 
 @app.route('/')
 def index():
@@ -100,6 +100,7 @@ def get_projects():
 @app.route('/create_project', methods=['POST'])
 def create_project():
     project_name = request.json.get('project_name')
+
     if project_name:
         project_path = os.path.join(BASE_DIR, project_name)
         if not os.path.exists(project_path):
@@ -185,7 +186,7 @@ def save_annotations():
     os.makedirs(project_annotations_dir, exist_ok=True)
     
     with open(os.path.join(project_annotations_dir, annotation_filename), 'w') as f:
-        json.dump(annotation_data, f)
+        json.dump(annotation_data, f, indent=2)
     
     return jsonify({'message': 'Annotations saved successfully'})
 
@@ -217,6 +218,27 @@ def load_annotations(project, csv_filename):
             'version': '2.0'
         }
     })
+
+@app.route('/annotate/<project>', methods=['POST'])
+def annotate_model(project):
+    data = request.json
+    project_annotations_dir = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR)
+    os.makedirs(project_annotations_dir, exist_ok=True)
+    print(data)
+    import time
+    for i in range(10):
+        with open(os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{data['annotator_id']}_annotation_status.json"), 'w') as f:
+            json.dump({'status': i}, f, indent=2)
+        time.sleep(0.25)
+    return jsonify({'message': 'Annotation successful'})
+
+@app.route('/annotation_status/<project>/<annotator_id>')
+def annotation_status(project, annotator_id):
+    annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{annotator_id}_annotation_status.json") 
+    if os.path.exists(annotation_status_file):
+        with open(annotation_status_file, 'r') as f:
+            return jsonify(json.load(f))
+    return jsonify({'status': 'completed'})
 
 @app.route('/delete_file', methods=['POST'])
 def delete_file():
