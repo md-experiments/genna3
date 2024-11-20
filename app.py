@@ -4,6 +4,7 @@ import json
 import os
 import yaml
 from collections import OrderedDict
+import time
 
 app = Flask(__name__)
 
@@ -225,7 +226,7 @@ def annotate_model(project):
     project_annotations_dir = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR)
     os.makedirs(project_annotations_dir, exist_ok=True)
     #print(data)
-    import time
+    
 
     annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{data['annotator_id']}_annotation_status.json")
     if os.path.exists(annotation_status_file):

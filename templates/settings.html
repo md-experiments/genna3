@@ -164,7 +164,7 @@
         border: 1px solid var(--border-color);
     }
     .progress-overlay {
-        position: fixed;
+        position: absolute;
         top: 0;
         left: 0;
         right: 0;
@@ -173,27 +173,35 @@
         display: none;
         justify-content: center;
         align-items: center;
-        z-index: 1000;
+        border-radius: 4px;
     }
     .progress-container {
         background: var(--bg-color);
-        padding: 20px;
-        border-radius: 8px;
+        padding: 12px;
+        border-radius: 4px;
         text-align: center;
-        min-width: 300px;
+        width: 90%;
+        font-size: 0.875rem;
     }
     .progress-spinner {
-        width: 50px;
-        height: 50px;
-        margin: 20px auto;
-        border: 5px solid #f3f3f3;
-        border-top: 5px solid #3498db;
+        width: 30px;
+        height: 30px;
+        margin: 10px auto;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3498db;
         border-radius: 50%;
         animation: spin 1s linear infinite;
     }
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+    .model-item {
+        position: relative; /* For absolute positioning of progress overlay */
+    }
+    .judge-annotators {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+    .judge-annotator-select {
+        flex: 1;
     }
 </style>
 </head>
@@ -255,12 +263,12 @@
                         </div>
                     </div>
                 </div>
-
-    <div class="card">
+<div class="card">
     <div class="card-body">
         <h6 class="mb-3">Add New Model</h6>
         <div class="annotator-form mb-3">
             <div class="annotator-form-row">
+                <input type="text" id="newAnnotatorName" class="form-control" placeholder="Unique Name" style="width: auto;">
                 <select id="newAnnotatorModel" class="form-control" style="width: auto;">
                     <option value="">Select Model</option>
                     <!-- Models will be loaded here -->
@@ -279,56 +287,132 @@
                 <label class="form-check-label" for="isJudge">Judge</label>
             </div>
         </div>
+        <div id="judgeAnnotators" class="judge-annotators" style="display: none;">
+            <select id="judgeAnnotator1" class="form-control judge-annotator-select">
+                <option value="">Select First Annotator</option>
+            </select>
+            <select id="judgeAnnotator2" class="form-control judge-annotator-select">
+                <option value="">Select Second Annotator</option>
+            </select>
+        </div>
         <div id="labelConfigs">
             <!-- Label configurations will be added here -->
         </div>
         <button class="btn btn-outline-secondary" type="button" id="addAnnotatorBtn">Add Model</button>
     </div>
 </div>
-<div class="mt-4 mb-4">
-            <button id="saveSettingsBtn" class="btn btn-primary">Save Settings</button>
-        </div>
-    </div>
 
-    
+<div class="mt-4 mb-4">
+    <button id="saveSettingsBtn" class="btn btn-primary">Save Settings</button>
+</div>
+</div>
+
+
 <!-- Add progress overlay -->
 <div class="progress-overlay" id="progressOverlay">
-    <div class="progress-container">
-        <h5>Annotating...</h5>
-        <div class="progress-spinner"></div>
-        <p id="progressStatus">Processing...</p>
-    </div>
+<div class="progress-container">
+<h5>Annotating...</h5>
+<div class="progress-spinner"></div>
+<p id="progressStatus">Processing...</p>
+</div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Previous JavaScript remains unchanged until createModelElement function
     document.addEventListener('DOMContentLoaded', () => {
-            const modeSwitch = document.getElementById('modeSwitch');
-            const projectObjective = document.getElementById('projectObjective');
-            const columnsContainer = document.getElementById('columnsContainer');
-            const annotatorsList = document.getElementById('annotatorsList');
-            const judgesList = document.getElementById('judgesList');
-            const isAnnotator = document.getElementById('isAnnotator');
-            const isJudge = document.getElementById('isJudge');
-            const addAnnotatorBtn = document.getElementById('addAnnotatorBtn');
-            const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-            const newAnnotatorLabelPrompts = document.getElementById('newAnnotatorLabelPrompts');
+        const modeSwitch = document.getElementById('modeSwitch');
+        const projectObjective = document.getElementById('projectObjective');
+        const columnsContainer = document.getElementById('columnsContainer');
+        const annotatorsList = document.getElementById('annotatorsList');
+        const judgesList = document.getElementById('judgesList');
+        const isAnnotator = document.getElementById('isAnnotator');
+        const isJudge = document.getElementById('isJudge');
+        const addAnnotatorBtn = document.getElementById('addAnnotatorBtn');
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+        const newAnnotatorLabelPrompts = document.getElementById('newAnnotatorLabelPrompts');
 
-            let availableModels = [];
-            let lastModelSettings = null;
+        let availableModels = [];
+        let lastModelSettings = null;
 
-            // Check for saved mode preference
-            if (localStorage.getItem('darkMode') === 'true') {
-                document.body.classList.add('dark-mode');
-                modeSwitch.checked = true;
+        // Dark mode handling
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+            modeSwitch.checked = true;
+        }
+
+        modeSwitch.addEventListener('change', () => {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', modeSwitch.checked);
+        });
+
+// Judge checkbox handler
+isJudge.addEventListener('change', function() {
+    // Simply toggle the checkbox, no need to show annotator selection
+    if (this.checked) {
+        isAnnotator.checked = false; // Can't be both annotator and judge
+    }
+});
+
+function generateAnnotatorId(model) {
+    // Create a hash from model details plus random component
+    const randomStr = Math.random().toString(36).substring(2, 15);
+    const modelString = `${model.model_name}-${model.temperature}-${Object.entries(model.label_types || {}).join('-')}-${randomStr}`;
+    return btoa(modelString).replace(/[^a-zA-Z0-9]/g, '');
+}
+
+function validateAnnotatorFields() {
+    const name = document.getElementById('newAnnotatorName').value.trim();
+    const model = document.getElementById('newAnnotatorModel').value.trim();
+    const temp = parseFloat(document.getElementById('newAnnotatorTemp').value);
+    const prompt = document.getElementById('newAnnotatorPrompt').value.trim();
+    const hasRole = isAnnotator.checked || isJudge.checked;
+
+    if (!name) {
+        alert('Please enter a unique name');
+        return false;
+    }
+    if (!model) {
+        alert('Please select a model');
+        return false;
+    }
+    if (isNaN(temp) || temp < 0 || temp > 1) {
+        alert('Temperature must be between 0 and 1');
+        return false;
+    }
+    if (!prompt) {
+        alert('Please enter a base prompt');
+        return false;
+    }
+    if (!hasRole) {
+        alert('Please select at least one role (Annotator or Judge)');
+        return false;
+    }
+
+    // Check if name is unique
+    const existingNames = new Set();
+    document.querySelectorAll('.model-item').forEach(item => {
+        existingNames.add(item.getAttribute('data-annotator-name'));
+    });
+    if (existingNames.has(name)) {
+        alert('This name is already in use. Please choose a unique name.');
+        return false;
+    }
+
+    const labelInputs = document.querySelectorAll('#labelConfigs input');
+    if (labelInputs.length > 0) {
+        let allPromptsValid = true;
+        labelInputs.forEach(input => {
+            if (!input.value.trim()) {
+                alert(`Please enter a prompt for ${input.dataset.column}`);
+                allPromptsValid = false;
             }
+        });
+        if (!allPromptsValid) return false;
+    }
 
-            modeSwitch.addEventListener('change', () => {
-                document.body.classList.toggle('dark-mode');
-                localStorage.setItem('darkMode', modeSwitch.checked);
-            });
-
-        function createColumnElement(columnName, settings) {
+    return true;
+}
+ // Model element creation and management
+function createColumnElement(columnName, settings) {
             const div = document.createElement('div');
             div.className = 'column-item';
             div.innerHTML = `
@@ -349,7 +433,6 @@
                 </div>
             `;
 
-            // Add click handlers for action buttons
             div.querySelectorAll('.action-btn').forEach(btn => {
                 btn.onclick = function() {
                     this.classList.toggle('active');
@@ -386,19 +469,7 @@
             }).join('');
         }
 
-function generateAnnotatorId(model) {
-    // Create a hash from model details and add random suffix
-    const modelString = `${model.model_name}-${model.temperature}-${Object.entries(model.label_types || {}).join('-')} ${Math.random()}`;
-    return btoa(modelString).replace(/[^a-zA-Z0-9]/g, '');
-}
-
 function createModelElement(model) {
-    // Ensure model has an annotator_id
-    if (!model.annotator_id) {
-        model.annotator_id = generateAnnotatorId(model);
-    }
-    
-    // Get list of labels with their types
     const labels = Object.entries(model.label_types || {})
         .map(([column, type]) => `${column} (${type})`)
         .join(', ');
@@ -406,18 +477,21 @@ function createModelElement(model) {
     const div = document.createElement('div');
     div.className = 'model-item';
     div.setAttribute('data-annotator-id', model.annotator_id);
+    div.setAttribute('data-annotator-name', model.name);
     div.innerHTML = `
         <div class="model-header">
             <div class="model-header-left">
                 <div class="model-name-labels">
-                    ${model.model_name}
+                    <strong>${model.name}</strong> (${model.model_name})
                     ${labels ? `<br><small class="text-muted">(${labels}) temp: ${model.temperature}</small>` : ''}
                 </div>
                 <div class="model-scores">
                     <!-- Scores will be added here -->
                 </div>
             </div>
-            <button class="btn btn-sm btn-primary annotate-btn">Annotate</button>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-primary annotate-btn">Annotate</button>
+            </div>
         </div>
         <div class="model-details" style="display: none;">
             <div class="mb-2">
@@ -431,147 +505,185 @@ function createModelElement(model) {
                 </div>
             `).join('')}
         </div>
+        <div class="progress-overlay">
+            <div class="progress-container">
+                <p id="progressStatus-${model.annotator_id}">Processing...</p>
+                <div class="progress-spinner"></div>
+            </div>
+        </div>
     `;
 
-    // Add click handler for model header (excluding the annotate button)
     div.querySelector('.model-header-left').addEventListener('click', () => {
         const details = div.querySelector('.model-details');
         details.style.display = details.style.display === 'none' ? 'block' : 'none';
     });
 
-    // Add click handler for annotate button
     div.querySelector('.annotate-btn').addEventListener('click', (e) => {
         e.stopPropagation();
-        startAnnotation(model, div);
+        if (model.roles?.includes('judge')) {
+            // Create modal for annotator selection
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Select Annotators to Judge</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">First Annotator</label>
+                                <select class="form-select judge-annotator-select">
+                                    <option value="">Select Annotator</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Second Annotator</label>
+                                <select class="form-select judge-annotator-select">
+                                    <option value="">Select Annotator</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary start-judging-btn">Start Judging</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            const modalInstance = new bootstrap.Modal(modal);
+
+            // Load available annotators from settings
+            fetch(`/get_project_settings/{{ project }}`)
+                .then(response => response.json())
+                .then(data => {
+                    const annotators = data.settings.ai_annotators
+                        .filter(m => m.roles?.includes('annotator'))
+                        .map(m => ({
+                            id: m.annotator_id,
+                            name: m.name
+                        }));
+
+                    const selects = modal.querySelectorAll('.judge-annotator-select');
+                    selects.forEach(select => {
+                        select.innerHTML = '<option value="">Select Annotator</option>' +
+                            annotators.map(ann => `<option value="${ann.id}">${ann.name}</option>`).join('');
+                    });
+                });
+
+            // Handle start judging
+            modal.querySelector('.start-judging-btn').addEventListener('click', () => {
+                const selects = modal.querySelectorAll('.judge-annotator-select');
+                const annotator1 = selects[0].value;
+                const annotator2 = selects[1].value;
+
+                if (!annotator1 || !annotator2) {
+                    alert('Please select both annotators');
+                    return;
+                }
+                if (annotator1 === annotator2) {
+                    alert('Please select different annotators');
+                    return;
+                }
+
+                model.judge_annotators = [annotator1, annotator2];
+                modalInstance.hide();
+                modal.addEventListener('hidden.bs.modal', () => {
+                    modal.remove();
+                    startAnnotation(model, div);
+                });
+            });
+
+            modalInstance.show();
+        } else {
+            startAnnotation(model, div);
+        }
     });
 
-    // Load scores for this model
     loadModelScores(model, div);
 
     return div;
 }
 
+// Annotation and scoring functions
 function startAnnotation(model, element) {
-    const progressOverlay = document.getElementById('progressOverlay');
-    const progressStatus = document.getElementById('progressStatus');
-    progressOverlay.style.display = 'flex';
-    progressStatus.textContent = 'Starting annotation...';
+            const progressOverlay = element.querySelector('.progress-overlay');
+            const progressStatus = element.querySelector(`#progressStatus-${model.annotator_id}`);
+            progressOverlay.style.display = 'flex';
+            progressStatus.textContent = 'Starting annotation...';
 
-    // Start polling immediately
-    pollAnnotationProgress(model, element);
+            pollAnnotationProgress(model, element);
 
-    // Start the annotation process (don't wait for response)
-    fetch(`/annotate/{{ project }}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(model)
-    });
-}
-
-function pollAnnotationProgress(model, element) {
-    const progressStatus = document.getElementById('progressStatus');
-    const progressOverlay = document.getElementById('progressOverlay');
-    let pollCount = 0;
-
-    function checkProgress() {
-        fetch(`/annotation_status/{{ project }}/${encodeURIComponent(model.annotator_id)}`)
-            .then(response => response.json())
-            .then(data => {
-                pollCount++;
-                if (data.status === 'completed') {
-                    progressStatus.textContent = 'Annotation completed successfully!';
-                    setTimeout(() => {
-                        progressOverlay.style.display = 'none';
-                        // Reload scores after completion
-                        loadModelScores(model, element);
-                    }, 1500);
-                } else if (data.status === 'error') {
-                    progressStatus.textContent = 'Error during annotation';
-                    setTimeout(() => {
-                        progressOverlay.style.display = 'none';
-                    }, 1500);
-                } else {
-                    // Update progress message
-                    progressStatus.textContent = data.message || `Processing... (${pollCount} checks)`;
-                    // Continue polling every 500ms
-                    setTimeout(checkProgress, 500);
-                }
-            })
-            .catch(error => {
-                console.error('Error checking progress:', error);
-                progressStatus.textContent = `Error checking progress (attempt ${pollCount})`;
-                // Continue polling even on error, but less frequently
-                setTimeout(checkProgress, 2000);
+            fetch(`/annotate/{{ project }}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(model)
             });
-    }
+        }
 
-    // Start polling immediately
-    checkProgress();
-}
+        function pollAnnotationProgress(model, element) {
+            const progressStatus = element.querySelector(`#progressStatus-${model.annotator_id}`);
+            const progressOverlay = element.querySelector('.progress-overlay');
+            let pollCount = 0;
 
-
-function loadModelScores(model, element) {
-    fetch(`/scores/{{ project }}/${encodeURIComponent(model.annotator_id)}`)
-        .then(response => response.json())
-        .then(scores => {
-            const scoresContainer = element.querySelector('.model-scores');
-            scoresContainer.innerHTML = Object.entries(scores)
-                .map(([metric, value]) => `
-                    <span class="score-item">
-                        ${metric}: ${typeof value === 'number' ? value.toFixed(2) : value}
-                    </span>
-                `).join('');
-        })
-        .catch(error => {
-            console.error('Error loading scores:', error);
-        });
-}
-
-function validateAnnotatorFields() {
-                const model = document.getElementById('newAnnotatorModel').value.trim();
-                const temp = parseFloat(document.getElementById('newAnnotatorTemp').value);
-                const prompt = document.getElementById('newAnnotatorPrompt').value.trim();
-                const hasRole = isAnnotator.checked || isJudge.checked;
-
-                if (!model) {
-                    alert('Please select a model');
-                    return false;
-                }
-                if (isNaN(temp) || temp < 0 || temp > 1) {
-                    alert('Temperature must be between 0 and 1');
-                    return false;
-                }
-                if (!prompt) {
-                    alert('Please enter a base prompt');
-                    return false;
-                }
-                if (!hasRole) {
-                    alert('Please select at least one role (Annotator or Judge)');
-                    return false;
-                }
-
-                // Validate label prompts
-                const labelInputs = document.querySelectorAll('#labelConfigs input');
-                if (labelInputs.length > 0) {
-                    let allPromptsValid = true;
-                    labelInputs.forEach(input => {
-                        if (!input.value.trim()) {
-                            alert(`Please enter a prompt for ${input.dataset.column}`);
-                            allPromptsValid = false;
+            function checkProgress() {
+                fetch(`/annotation_status/{{ project }}/${encodeURIComponent(model.annotator_id)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        pollCount++;
+                        if (data.status === 'completed') {
+                            progressStatus.textContent = 'Annotation completed successfully!';
+                            setTimeout(() => {
+                                progressOverlay.style.display = 'none';
+                                loadModelScores(model, element);
+                            }, 1500);
+                        } else if (data.status === 'error') {
+                            progressStatus.textContent = 'Error during annotation';
+                            setTimeout(() => {
+                                progressOverlay.style.display = 'none';
+                            }, 1500);
+                        } else {
+                            progressStatus.textContent = data.message || `Processing... (${pollCount} checks)`;
+                            setTimeout(checkProgress, 500);
                         }
+                    })
+                    .catch(error => {
+                        console.error('Error checking progress:', error);
+                        progressStatus.textContent = `Error checking progress (attempt ${pollCount})`;
+                        setTimeout(checkProgress, 2000);
                     });
-                    if (!allPromptsValid) return false;
-                }
-
-                return true;
             }
 
+            checkProgress();
+        }
+
+        function loadModelScores(model, element) {
+            fetch(`/scores/{{ project }}/${encodeURIComponent(model.annotator_id)}`)
+                .then(response => response.json())
+                .then(scores => {
+                    const scoresContainer = element.querySelector('.model-scores');
+                    scoresContainer.innerHTML = Object.entries(scores)
+                        .map(([metric, value]) => `
+                            <span class="score-item">
+                                ${metric}: ${typeof value === 'number' ? value.toFixed(2) : value}
+                            </span>
+                        `).join('');
+                })
+                .catch(error => {
+                    console.error('Error loading scores:', error);
+                });
+        }
+
+        // Button handlers
 addAnnotatorBtn.onclick = () => {
     if (!validateAnnotatorFields()) return;
 
     const model = {
+        name: document.getElementById('newAnnotatorName').value.trim(),
         model_name: document.getElementById('newAnnotatorModel').value,
         temperature: parseFloat(document.getElementById('newAnnotatorTemp').value),
         prompt: document.getElementById('newAnnotatorPrompt').value.trim(),
@@ -580,21 +692,21 @@ addAnnotatorBtn.onclick = () => {
         roles: []
     };
 
-    // Collect label configurations
     document.querySelectorAll('#labelConfigs .label-config').forEach(config => {
         const column = config.querySelector('input').dataset.column;
         model.label_prompts[column] = config.querySelector('input').value.trim();
         model.label_types[column] = config.querySelector('select').value;
     });
 
-    // Add roles
-    if (isAnnotator.checked) model.roles.push('annotator');
-    if (isJudge.checked) model.roles.push('judge');
+    if (isAnnotator.checked) {
+        model.roles.push('annotator');
+    }
+    if (isJudge.checked) {
+        model.roles.push('judge');
+    }
 
-    // Generate annotator_id
     model.annotator_id = generateAnnotatorId(model);
 
-    // Save as last model settings
     lastModelSettings = {
         model_name: model.model_name,
         temperature: model.temperature,
@@ -604,18 +716,15 @@ addAnnotatorBtn.onclick = () => {
         annotator_id: model.annotator_id
     };
 
-    // Create model element
     const modelElement = createModelElement(model);
 
-    // Add to appropriate lists
     if (isAnnotator.checked) {
-        annotatorsList.appendChild(modelElement.cloneNode(true));
+        annotatorsList.appendChild(modelElement);
     }
     if (isJudge.checked) {
-        judgesList.appendChild(modelElement.cloneNode(true));
+        judgesList.appendChild(modelElement);
     }
 
-    // Save settings to backend
     fetch(`/get_project_settings/{{ project }}`)
         .then(response => response.json())
         .then(data => {
@@ -638,56 +747,56 @@ addAnnotatorBtn.onclick = () => {
             });
         });
 
-    // Clear role checkboxes only
+    // Reset form
     isAnnotator.checked = false;
     isJudge.checked = false;
-
-    // Prepopulate for next model
+    document.getElementById('newAnnotatorName').value = '';
     document.getElementById('newAnnotatorModel').value = model.model_name;
     document.getElementById('newAnnotatorTemp').value = model.temperature;
     document.getElementById('newAnnotatorPrompt').value = model.prompt;
 };
 
+<!-- Rest of the code remains unchanged -->
+
 saveSettingsBtn.onclick = () => {
-    const columnSettings = {};
-    columnsContainer.querySelectorAll('.column-item').forEach(item => {
-        const columnName = item.querySelector('.column-name').textContent;
-        columnSettings[columnName] = {
-            show: item.querySelector('.show').classList.contains('active'),
-            label: item.querySelector('.label').classList.contains('active'),
-            content: item.querySelector('.content').classList.contains('active'),
-            filter: item.querySelector('.filter').classList.contains('active')
-        };
-    });
-
-    // Get the current settings from the backend and update only the columns and objective
-    fetch(`/get_project_settings/{{ project }}`)
-        .then(response => response.json())
-        .then(data => {
-            const settings = data.settings;
-            settings.objective = projectObjective.value;
-            settings.columns = columnSettings;
-
-            // Save the updated settings
-            fetch(`/save_project_settings/{{ project }}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(settings)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Settings saved successfully!');
-                } else {
-                    alert('Error saving settings');
-                }
+            const columnSettings = {};
+            columnsContainer.querySelectorAll('.column-item').forEach(item => {
+                const columnName = item.querySelector('.column-name').textContent;
+                columnSettings[columnName] = {
+                    show: item.querySelector('.show').classList.contains('active'),
+                    label: item.querySelector('.label').classList.contains('active'),
+                    content: item.querySelector('.content').classList.contains('active'),
+                    filter: item.querySelector('.filter').classList.contains('active')
+                };
             });
-        });
-};
 
-function loadSettings() {
+            fetch(`/get_project_settings/{{ project }}`)
+                .then(response => response.json())
+                .then(data => {
+                    const settings = data.settings;
+                    settings.objective = projectObjective.value;
+                    settings.columns = columnSettings;
+
+                    fetch(`/save_project_settings/{{ project }}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(settings)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Settings saved successfully!');
+                        } else {
+                            alert('Error saving settings');
+                        }
+                    });
+                });
+        };
+
+        // Initial load
+        function loadSettings() {
             fetch(`/get_project_settings/{{ project }}`)
                 .then(response => response.json())
                 .then(data => {
@@ -697,12 +806,10 @@ function loadSettings() {
                     
                     projectObjective.value = settings.objective || '';
                     
-                    // Load model options
                     const modelSelect = document.getElementById('newAnnotatorModel');
                     modelSelect.innerHTML = '<option value="">Select Model</option>' +
                         availableModels.map(model => `<option value="${model}">${model}</option>`).join('');
                     
-                    // Load columns
                     columnsContainer.innerHTML = '';
                     columns.forEach(column => {
                         const columnSettings = settings.columns[column] || {
@@ -714,7 +821,6 @@ function loadSettings() {
                         columnsContainer.appendChild(createColumnElement(column, columnSettings));
                     });
 
-                    // Load AI models
                     annotatorsList.innerHTML = '';
                     judgesList.innerHTML = '';
                     const models = settings.ai_annotators || [];
@@ -727,23 +833,18 @@ function loadSettings() {
                         }
                     });
 
-                    // Set last model settings if any models exist
                     if (models.length > 0) {
                         lastModelSettings = models[models.length - 1];
-                        // Prepopulate form with last model settings
                         document.getElementById('newAnnotatorModel').value = lastModelSettings.model_name;
                         document.getElementById('newAnnotatorTemp').value = lastModelSettings.temperature;
                         document.getElementById('newAnnotatorPrompt').value = lastModelSettings.prompt;
                     }
 
-                    // Update label configs based on active label columns
                     updateLabelConfigs();
                 });
         }
 
-        // Load initial settings
         loadSettings();
     });
 </script>
-</body>
-</html>
+

@@ -1,101 +1,135 @@
-# Genna - Generative AI Annotation Tool
+# Genna - Text Annotation System
 
-Genna (a portmanteau of "Generative AI" and "Annotation") is a powerful web-based annotation tool designed to facilitate data labeling and organization. It provides an intuitive interface for managing multiple annotation projects, with features specifically tailored for analyzing and categorizing data.
+Genna is a Flask-based text annotation system that allows you to:
+1. Upload and manage CSV files for annotation
+2. Configure AI models as annotators and judges
+3. Manage annotations across multiple projects
+4. Compare and evaluate annotations through a judging system
 
 ## Features
 
 ### Project Management
 - Create and manage multiple annotation projects
-- Configure project-specific settings
-- Set project objectives and category columns
-- Hierarchical project/file organization
+- Upload CSV files to projects
+- Configure which columns to show, label, use as content, or filter
+- Set project objectives and annotation guidelines
 
-### Data Handling
-- CSV file upload support
-- Dynamic table view with sorting capabilities
-- Multi-filter functionality based on customizable category columns
-- Real-time annotation saving
+### AI Models
+- Configure AI models (like GPT-3, GPT-4) as annotators or judges
+- Customize model parameters:
+  - Temperature for controlling randomness
+  - Custom prompts for different annotation tasks
+  - Label types (text, boolean, numeric)
 
 ### Annotation System
-- Thumbs up/down annotation options
-- Comment field for detailed notes
-- Auto-saving with debounce protection
-- Separate storage for annotations and source files
+1. **Annotators**
+   - AI models configured to annotate text
+   - Each annotator has a unique name and configuration
+   - Can handle multiple label types per annotation
+   - Annotations are stored separately from source data
 
-### User Interface
-- Clean, modern Bootstrap-based design
-- Dark/light mode toggle
-- Responsive layout for all screen sizes
-- Intuitive project navigation
+2. **Judges**
+   - Special AI models that evaluate annotations
+   - Compare annotations from two different annotators
+   - Selected dynamically at annotation time
+   - Help evaluate annotation quality and consistency
 
-## Project Structure
-
-```
-genna/
-├── app.py              # Flask application main file
-├── static/
-│   ├── script.js       # Client-side JavaScript
-│   ├── styles.css      # Custom CSS styles
-│   └── favicon.ico     # Site favicon
-├── templates/
-│   ├── index.html      # Main annotation interface
-│   └── settings.html   # Project settings page
-└── data/              # Project data directory
-    └── {project_name}/ # Individual project directories
-        ├── project_settings.json  # Project configuration
-        ├── {csv_files}           # Uploaded CSV files
-        └── annotations/          # Annotation JSON files
-```
-
-## Setup
-
-1. Install dependencies:
-```bash
-pip install flask pandas
-```
-
-2. Run the application:
-```bash
-python app.py
-```
-
-3. Access the application at `http://localhost:5001`
+### Category Columns
+- Filter data using category columns
+- Multi-select filtering capabilities
+- Organize and manage annotations by categories
 
 ## Usage
 
-1. Project Creation:
-   - Click the '+' button to create a new project
-   - Configure project settings using the gear icon
-   - Set project objective and category columns
+### Setting Up a Project
+1. Create a new project
+2. Upload your CSV file
+3. Configure column settings:
+   - Show: Columns to display
+   - Label: Columns to annotate
+   - Content: Columns containing text to annotate
+   - Filter: Category columns for filtering
 
-2. Data Upload:
-   - Select a project from the dropdown
-   - Use the file input to upload CSV files
-   - Files appear in the project's file list
+### Creating Annotators
+1. Go to project settings
+2. Click "Add New Model"
+3. Configure the annotator:
+   - Give it a unique name
+   - Select the AI model
+   - Set temperature
+   - Write base prompt
+   - Configure label prompts
+4. Save the annotator
 
-3. Annotation:
-   - Click on a CSV file to load it
-   - Use thumbs up/down to annotate rows
-   - Add comments as needed
-   - All changes save automatically
+### Using Judges
+1. Create a judge model similar to annotators
+2. When running the judge:
+   - Click "Annotate" on the judge
+   - Select two annotators to compare
+   - Judge will evaluate their annotations
+   - Results appear in the scores section
 
-4. Filtering:
-   - Use the multi-select filters at the top
-   - Combine multiple category filters
-   - Filters are based on project settings
-
-## Data Organization
-
-- Each project has its own directory
-- CSV files are stored in the project directory
-- Annotations are stored separately as JSON files
-- Project settings maintain category configurations
-- All data is organized hierarchically for easy management
+### Managing Files
+- Files are automatically organized by project
+- Annotations stored separately from source files
+- Easy deletion of files when needed
+- Category-based filtering for better organization
 
 ## Technical Details
 
-- Backend: Flask (Python)
-- Frontend: JavaScript, Bootstrap 5
-- Data Storage: File-based (CSV, JSON)
-- Styling: Custom CSS with dark/light mode support
-- Real-time Updates: Debounced auto-saving
+### File Structure
+```
+project_name/
+├── data/
+│   ├── source_files/
+│   │   └── uploaded_csv_files
+│   └── annotations/
+│       └── annotator_results
+├── settings/
+│   └── project_settings.json
+└── models/
+    └── model_configurations
+```
+
+### Annotation Format
+Annotations are stored in a structured format:
+```json
+{
+  "annotator_id": "unique_id",
+  "timestamp": "ISO_timestamp",
+  "labels": {
+    "column1": "value1",
+    "column2": true,
+    "column3": 5
+  }
+}
+```
+
+### Judge Evaluation
+Judges compare annotations by:
+1. Analyzing both annotators' results
+2. Evaluating consistency and quality
+3. Providing numerical scores
+4. Highlighting discrepancies
+
+## Best Practices
+
+1. **Project Setup**
+   - Clear project objectives
+   - Well-defined annotation guidelines
+   - Consistent label schemas
+
+2. **Model Configuration**
+   - Descriptive model names
+   - Clear, specific prompts
+   - Appropriate temperature settings
+
+3. **Judging**
+   - Regular evaluation of annotations
+   - Compare different annotator combinations
+   - Monitor scores for quality control
+
+4. **Data Management**
+   - Regular backups
+   - Clear category organization
+   - Periodic cleanup of unused files
