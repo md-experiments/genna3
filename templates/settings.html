@@ -332,46 +332,47 @@
             }).join('');
         }
 
-    function createModelElement(model) {
-        // Get list of labels with their types
-        const labels = Object.entries(model.label_types || {})
-            .map(([column, type]) => `${column} (${type})`)
-            .join(', ');
-        
-        const div = document.createElement('div');
-        div.className = 'model-item';
-        div.innerHTML = `
-            <div class="model-header">
-                <div class="model-header-left">
-                    <div class="model-name-labels">
-                        ${model.model_name}
-                        ${labels ? `<br><small class="text-muted">${labels}</small>` : ''}
-                    </div>
-                    <small class="text-muted">temp: ${model.temperature}</small>
+function createModelElement(model) {
+    // Get list of labels with their types
+    const labels = Object.entries(model.label_types || {})
+        .map(([column, type]) => `${column} (${type})`)
+        .join(', ');
+    
+    const div = document.createElement('div');
+    div.className = 'model-item';
+    div.innerHTML = `
+        <div class="model-header">
+            <div class="model-header-left">
+                <div class="model-name-labels">
+                    ${model.model_name}
+                    ${labels ? `<br><small class="text-muted">(${labels}) temp: ${model.temperature}</small>` : ''}
                 </div>
             </div>
-            <div class="model-details" style="display: none;">
+        </div>
+        <div class="model-details" style="display: none;">
+            <div class="mb-2">
+                <small class="text-muted">Base Prompt:</small>
+                <pre class="border rounded p-2 bg-light mb-2"><code>${model.prompt}</code></pre>
+            </div>
+            ${Object.entries(model.label_prompts || {}).map(([column, prompt]) => `
                 <div class="mb-2">
-                    <small class="text-muted">Base Prompt:</small>
-                    <pre class="border rounded p-2 bg-light mb-2"><code>${model.prompt}</code></pre>
+                    <small class="text-muted">${column} (${model.label_types[column]}):</small>
+                    <pre class="border rounded p-2 bg-light mb-1"><code>${prompt}</code></pre>
                 </div>
-                ${Object.entries(model.label_prompts || {}).map(([column, prompt]) => `
-                    <div class="mb-2">
-                        <small class="text-muted">${column} (${model.label_types[column]}):</small>
-                        <pre class="border rounded p-2 bg-light mb-1"><code>${prompt}</code></pre>
-                    </div>
-                `).join('')}
-            </div>
-        `;
+            `).join('')}
+        </div>
+    `;
 
-        div.querySelector('.model-header').addEventListener('click', () => {
-            const details = div.querySelector('.model-details');
-            details.style.display = details.style.display === 'none' ? 'block' : 'none';
-        });
+    div.querySelector('.model-header').addEventListener('click', () => {
+        const details = div.querySelector('.model-details');
+        details.style.display = details.style.display === 'none' ? 'block' : 'none';
+    });
 
-        return div;
-    }
-    function validateAnnotatorFields() {
+    return div;
+}
+
+<!-- Previous code remains unchanged until saveSettings function -->
+function validateAnnotatorFields() {
                 const model = document.getElementById('newAnnotatorModel').value.trim();
                 const temp = parseFloat(document.getElementById('newAnnotatorTemp').value);
                 const prompt = document.getElementById('newAnnotatorPrompt').value.trim();
@@ -410,106 +411,103 @@
                 return true;
             }
 
-            addAnnotatorBtn.onclick = () => {
-                if (!validateAnnotatorFields()) return;
+addAnnotatorBtn.onclick = () => {
+    if (!validateAnnotatorFields()) return;
 
-                const model = {
-                    model_name: document.getElementById('newAnnotatorModel').value,
-                    temperature: parseFloat(document.getElementById('newAnnotatorTemp').value),
-                    prompt: document.getElementById('newAnnotatorPrompt').value.trim(),
-                    label_prompts: {},
-                    label_types: {}
-                };
+    const model = {
+        model_name: document.getElementById('newAnnotatorModel').value,
+        temperature: parseFloat(document.getElementById('newAnnotatorTemp').value),
+        prompt: document.getElementById('newAnnotatorPrompt').value.trim(),
+        label_prompts: {},
+        label_types: {},
+        roles: []
+    };
 
-                // Collect label configurations
-                document.querySelectorAll('#labelConfigs .label-config').forEach(config => {
-                    const column = config.querySelector('input').dataset.column;
-                    model.label_prompts[column] = config.querySelector('input').value.trim();
-                    model.label_types[column] = config.querySelector('select').value;
-                });
+    // Collect label configurations
+    document.querySelectorAll('#labelConfigs .label-config').forEach(config => {
+        const column = config.querySelector('input').dataset.column;
+        model.label_prompts[column] = config.querySelector('input').value.trim();
+        model.label_types[column] = config.querySelector('select').value;
+    });
 
-                // Save as last model settings
-                lastModelSettings = {
-                    model_name: model.model_name,
-                    temperature: model.temperature,
-                    prompt: model.prompt,
-                    label_prompts: {...model.label_prompts},
-                    label_types: {...model.label_types}
-                };
+    // Add roles
+    if (isAnnotator.checked) model.roles.push('annotator');
+    if (isJudge.checked) model.roles.push('judge');
 
-                const modelElement = createModelElement(model);
+    // Save as last model settings
+    lastModelSettings = {
+        model_name: model.model_name,
+        temperature: model.temperature,
+        prompt: model.prompt,
+        label_prompts: {...model.label_prompts},
+        label_types: {...model.label_types}
+    };
 
-                if (isAnnotator.checked) {
-                    annotatorsList.appendChild(modelElement.cloneNode(true));
+    // Create model element
+    const modelElement = createModelElement(model);
+
+    // Add to appropriate lists
+    if (isAnnotator.checked) {
+        annotatorsList.appendChild(modelElement.cloneNode(true));
+    }
+    if (isJudge.checked) {
+        judgesList.appendChild(modelElement.cloneNode(true));
+    }
+
+    // Save settings to backend
+    fetch(`/get_project_settings/{{ project }}`)
+        .then(response => response.json())
+        .then(data => {
+            const settings = data.settings;
+            settings.ai_annotators = settings.ai_annotators || [];
+            settings.ai_annotators.push(model);
+
+            fetch(`/save_project_settings/{{ project }}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert('Error saving model settings');
                 }
-                if (isJudge.checked) {
-                    judgesList.appendChild(modelElement.cloneNode(true));
-                }
-
-                // Clear role checkboxes only
-                isAnnotator.checked = false;
-                isJudge.checked = false;
-
-                // Prepopulate for next model
-                document.getElementById('newAnnotatorModel').value = model.model_name;
-                document.getElementById('newAnnotatorTemp').value = model.temperature;
-                document.getElementById('newAnnotatorPrompt').value = model.prompt;
-            };
-
-            function extractModelData(item) {
-                const labelTypes = {};
-                const labelPrompts = {};
-                
-                Array.from(item.querySelectorAll('.model-details pre')).slice(1).forEach(pre => {
-                    const header = pre.previousElementSibling.textContent;
-                    const match = header.match(/(.*?)\s*\((.*?)\):/);
-                    if (match) {
-                        const [_, column, type] = match;
-                        labelTypes[column] = type;
-                        labelPrompts[column] = pre.querySelector('code').textContent;
-                    }
-                });
-
-                return {
-                    model_name: item.querySelector('.model-name').textContent,
-                    temperature: parseFloat(item.querySelector('.text-muted').textContent.split(': ')[1]),
-                    prompt: item.querySelector('code').textContent,
-                    label_prompts: labelPrompts,
-                    label_types: labelTypes
-                };
-            }
-
-
-        saveSettingsBtn.onclick = () => {
-            const columnSettings = {};
-            columnsContainer.querySelectorAll('.column-item').forEach(item => {
-                const columnName = item.querySelector('.column-name').textContent;
-                columnSettings[columnName] = {
-                    show: item.querySelector('.show').classList.contains('active'),
-                    label: item.querySelector('.label').classList.contains('active'),
-                    content: item.querySelector('.content').classList.contains('active'),
-                    filter: item.querySelector('.filter').classList.contains('active')
-                };
             });
+        });
 
-            const annotators = Array.from(annotatorsList.querySelectorAll('.model-item'))
-                .map(item => ({
-                    ...extractModelData(item),
-                    roles: ['annotator']
-                }));
+    // Clear role checkboxes only
+    isAnnotator.checked = false;
+    isJudge.checked = false;
 
-            const judges = Array.from(judgesList.querySelectorAll('.model-item'))
-                .map(item => ({
-                    ...extractModelData(item),
-                    roles: ['judge']
-                }));
+    // Prepopulate for next model
+    document.getElementById('newAnnotatorModel').value = model.model_name;
+    document.getElementById('newAnnotatorTemp').value = model.temperature;
+    document.getElementById('newAnnotatorPrompt').value = model.prompt;
+};
 
-            const settings = {
-                objective: projectObjective.value,
-                columns: columnSettings,
-                ai_annotators: [...annotators, ...judges]
-            };
+saveSettingsBtn.onclick = () => {
+    const columnSettings = {};
+    columnsContainer.querySelectorAll('.column-item').forEach(item => {
+        const columnName = item.querySelector('.column-name').textContent;
+        columnSettings[columnName] = {
+            show: item.querySelector('.show').classList.contains('active'),
+            label: item.querySelector('.label').classList.contains('active'),
+            content: item.querySelector('.content').classList.contains('active'),
+            filter: item.querySelector('.filter').classList.contains('active')
+        };
+    });
 
+    // Get the current settings from the backend and update only the columns and objective
+    fetch(`/get_project_settings/{{ project }}`)
+        .then(response => response.json())
+        .then(data => {
+            const settings = data.settings;
+            settings.objective = projectObjective.value;
+            settings.columns = columnSettings;
+
+            // Save the updated settings
             fetch(`/save_project_settings/{{ project }}`, {
                 method: 'POST',
                 headers: {
@@ -525,9 +523,10 @@
                     alert('Error saving settings');
                 }
             });
-        };
+        });
+};
 
-        function loadSettings() {
+function loadSettings() {
             fetch(`/get_project_settings/{{ project }}`)
                 .then(response => response.json())
                 .then(data => {
