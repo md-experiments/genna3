@@ -386,7 +386,18 @@
             }).join('');
         }
 
+function generateAnnotatorId(model) {
+    // Create a hash from model details and add random suffix
+    const modelString = `${model.model_name}-${model.temperature}-${Object.entries(model.label_types || {}).join('-')} ${Math.random()}`;
+    return btoa(modelString).replace(/[^a-zA-Z0-9]/g, '');
+}
+
 function createModelElement(model) {
+    // Ensure model has an annotator_id
+    if (!model.annotator_id) {
+        model.annotator_id = generateAnnotatorId(model);
+    }
+    
     // Get list of labels with their types
     const labels = Object.entries(model.label_types || {})
         .map(([column, type]) => `${column} (${type})`)
@@ -394,7 +405,7 @@ function createModelElement(model) {
     
     const div = document.createElement('div');
     div.className = 'model-item';
-    div.setAttribute('data-model-name', model.model_name);
+    div.setAttribute('data-annotator-id', model.annotator_id);
     div.innerHTML = `
         <div class="model-header">
             <div class="model-header-left">
@@ -446,42 +457,29 @@ function startAnnotation(model, element) {
     progressOverlay.style.display = 'flex';
     progressStatus.textContent = 'Starting annotation...';
 
-    // Start the annotation process
+    // Start polling immediately
+    pollAnnotationProgress(model, element);
+
+    // Start the annotation process (don't wait for response)
     fetch(`/annotate/{{ project }}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify(model)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Start polling for progress
-            pollAnnotationProgress(model, element);
-        } else {
-            progressStatus.textContent = 'Error starting annotation';
-            setTimeout(() => {
-                progressOverlay.style.display = 'none';
-            }, 1500);
-        }
-    })
-    .catch(error => {
-        progressStatus.textContent = 'Error during annotation';
-        setTimeout(() => {
-            progressOverlay.style.display = 'none';
-        }, 1500);
     });
 }
 
 function pollAnnotationProgress(model, element) {
     const progressStatus = document.getElementById('progressStatus');
     const progressOverlay = document.getElementById('progressOverlay');
+    let pollCount = 0;
 
     function checkProgress() {
         fetch(`/annotation_status/{{ project }}/${encodeURIComponent(model.annotator_id)}`)
             .then(response => response.json())
             .then(data => {
+                pollCount++;
                 if (data.status === 'completed') {
                     progressStatus.textContent = 'Annotation completed successfully!';
                     setTimeout(() => {
@@ -496,41 +494,42 @@ function pollAnnotationProgress(model, element) {
                     }, 1500);
                 } else {
                     // Update progress message
-                    progressStatus.textContent = data.message || 'Processing...';
-                    // Continue polling
-                    setTimeout(checkProgress, 1000);
+                    progressStatus.textContent = data.message || `Processing... (${pollCount} checks)`;
+                    // Continue polling every 500ms
+                    setTimeout(checkProgress, 500);
                 }
             })
             .catch(error => {
-                progressStatus.textContent = 'Error checking progress';
-                setTimeout(() => {
-                    progressOverlay.style.display = 'none';
-                }, 1500);
+                console.error('Error checking progress:', error);
+                progressStatus.textContent = `Error checking progress (attempt ${pollCount})`;
+                // Continue polling even on error, but less frequently
+                setTimeout(checkProgress, 2000);
             });
     }
 
-    // Start polling
+    // Start polling immediately
     checkProgress();
 }
 
-function loadModelScores(model, element) {
-        fetch(`/scores/{{ project }}/${encodeURIComponent(model.model_name)}`)
-            .then(response => response.json())
-            .then(scores => {
-                const scoresContainer = element.querySelector('.model-scores');
-                scoresContainer.innerHTML = Object.entries(scores)
-                    .map(([metric, value]) => `
-                        <span class="score-item">
-                            ${metric}: ${typeof value === 'number' ? value.toFixed(2) : value}
-                        </span>
-                    `).join('');
-            })
-            .catch(error => {
-                console.error('Error loading scores:', error);
-            });
-    }
 
-    function validateAnnotatorFields() {
+function loadModelScores(model, element) {
+    fetch(`/scores/{{ project }}/${encodeURIComponent(model.annotator_id)}`)
+        .then(response => response.json())
+        .then(scores => {
+            const scoresContainer = element.querySelector('.model-scores');
+            scoresContainer.innerHTML = Object.entries(scores)
+                .map(([metric, value]) => `
+                    <span class="score-item">
+                        ${metric}: ${typeof value === 'number' ? value.toFixed(2) : value}
+                    </span>
+                `).join('');
+        })
+        .catch(error => {
+            console.error('Error loading scores:', error);
+        });
+}
+
+function validateAnnotatorFields() {
                 const model = document.getElementById('newAnnotatorModel').value.trim();
                 const temp = parseFloat(document.getElementById('newAnnotatorTemp').value);
                 const prompt = document.getElementById('newAnnotatorPrompt').value.trim();
@@ -592,13 +591,17 @@ addAnnotatorBtn.onclick = () => {
     if (isAnnotator.checked) model.roles.push('annotator');
     if (isJudge.checked) model.roles.push('judge');
 
+    // Generate annotator_id
+    model.annotator_id = generateAnnotatorId(model);
+
     // Save as last model settings
     lastModelSettings = {
         model_name: model.model_name,
         temperature: model.temperature,
         prompt: model.prompt,
         label_prompts: {...model.label_prompts},
-        label_types: {...model.label_types}
+        label_types: {...model.label_types},
+        annotator_id: model.annotator_id
     };
 
     // Create model element

@@ -224,13 +224,19 @@ def annotate_model(project):
     data = request.json
     project_annotations_dir = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR)
     os.makedirs(project_annotations_dir, exist_ok=True)
-    print(data)
+    #print(data)
     import time
+
+    annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{data['annotator_id']}_annotation_status.json")
+    if os.path.exists(annotation_status_file):
+        os.remove(annotation_status_file)
     for i in range(10):
-        with open(os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{data['annotator_id']}_annotation_status.json"), 'w') as f:
-            json.dump({'status': i}, f, indent=2)
+        with open(annotation_status_file, 'w') as f:
+            json.dump({'message': f'{int(100*i/10)}% complete', 'status': 'ongoing'}, f, indent=2)
         time.sleep(0.25)
-    return jsonify({'message': 'Annotation successful'})
+    with open(annotation_status_file, 'w') as f:
+        json.dump({'status': 'completed'}, f, indent=2)
+    return jsonify({'status': 'completed'})
 
 @app.route('/annotation_status/<project>/<annotator_id>')
 def annotation_status(project, annotator_id):
@@ -238,7 +244,16 @@ def annotation_status(project, annotator_id):
     if os.path.exists(annotation_status_file):
         with open(annotation_status_file, 'r') as f:
             return jsonify(json.load(f))
-    return jsonify({'status': 'completed'})
+    else:
+        return jsonify({'message': f'Starting', 'status': 'ongoing'})
+
+@app.route('/scores/<project>/<annotator_id>')
+def get_scores(project, annotator_id):
+    annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{annotator_id}_annotation_scores.json") 
+    if os.path.exists(annotation_status_file):
+        with open(annotation_status_file, 'r') as f:
+            return jsonify(json.load(f))
+    return jsonify({'test': 1,'tes2t': 2})
 
 @app.route('/delete_file', methods=['POST'])
 def delete_file():
