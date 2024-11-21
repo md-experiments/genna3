@@ -169,9 +169,10 @@ def load_csv(project, filename):
 @app.route('/save_annotations', methods=['POST'])
 def save_annotations():
     data = request.json
+    print(data.keys())
     project = data['project']
     csv_filename = data['csv_filename']
-    annotations = data['annotations']
+    annotations = data['manual_annotations']
     
     annotation_data = {
         'manual_annotations': annotations,
