@@ -1,3 +1,4 @@
+<!-- Previous code remains unchanged until addAnnotatorBtn.onclick -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -609,59 +610,79 @@ function createModelElement(model) {
 
 // Annotation and scoring functions
 function startAnnotation(model, element) {
-            const progressOverlay = element.querySelector('.progress-overlay');
-            const progressStatus = element.querySelector(`#progressStatus-${model.annotator_id}`);
-            progressOverlay.style.display = 'flex';
-            progressStatus.textContent = 'Starting annotation...';
+    const progressOverlay = element.querySelector('.progress-overlay');
+    const progressStatus = element.querySelector(`#progressStatus-${model.annotator_id}`);
+    progressOverlay.style.display = 'flex';
+    progressStatus.textContent = 'Starting annotation...';
 
-            pollAnnotationProgress(model, element);
-
-            fetch(`/annotate/{{ project }}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(model)
-            });
-        }
-
-        function pollAnnotationProgress(model, element) {
-            const progressStatus = element.querySelector(`#progressStatus-${model.annotator_id}`);
-            const progressOverlay = element.querySelector('.progress-overlay');
-            let pollCount = 0;
-
-            function checkProgress() {
-                fetch(`/annotation_status/{{ project }}/${encodeURIComponent(model.annotator_id)}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        pollCount++;
-                        if (data.status === 'completed') {
-                            progressStatus.textContent = 'Annotation completed successfully!';
-                            setTimeout(() => {
-                                progressOverlay.style.display = 'none';
-                                loadModelScores(model, element);
-                            }, 1500);
-                        } else if (data.status === 'error') {
-                            progressStatus.textContent = 'Error during annotation';
-                            setTimeout(() => {
-                                progressOverlay.style.display = 'none';
-                            }, 1500);
-                        } else {
-                            progressStatus.textContent = data.message || `Processing... (${pollCount} checks)`;
-                            setTimeout(checkProgress, 500);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error checking progress:', error);
-                        progressStatus.textContent = `Error checking progress (attempt ${pollCount})`;
-                        setTimeout(checkProgress, 2000);
-                    });
+    // For judges, include selected annotator details
+    const annotationData = {
+        ...model,
+        selected_annotators: model.judge_annotators ? {
+            first: {
+                id: model.judge_annotators[0],
+                name: document.querySelector(`[data-annotator-id="${model.judge_annotators[0]}"]`)?.getAttribute('data-annotator-name')
+            },
+            second: {
+                id: model.judge_annotators[1],
+                name: document.querySelector(`[data-annotator-id="${model.judge_annotators[1]}"]`)?.getAttribute('data-annotator-name')
             }
+        } : undefined
+    };
 
-            checkProgress();
-        }
+    pollAnnotationProgress(annotationData, element);
 
-        function loadModelScores(model, element) {
+    fetch(`/annotate/{{ project }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(annotationData)
+    });
+}
+
+function pollAnnotationProgress(model, element) {
+    const progressStatus = element.querySelector(`#progressStatus-${model.annotator_id}`);
+    const progressOverlay = element.querySelector('.progress-overlay');
+    let pollCount = 0;
+
+    function checkProgress() {
+        // Include selected annotator details in status URL for judges
+        const statusUrl = model.selected_annotators 
+            ? `/annotation_status/{{ project }}/${encodeURIComponent(model.annotator_id)}/${encodeURIComponent(model.selected_annotators.first.id)}/${encodeURIComponent(model.selected_annotators.second.id)}`
+            : `/annotation_status/{{ project }}/${encodeURIComponent(model.annotator_id)}`;
+
+        fetch(statusUrl)
+            .then(response => response.json())
+            .then(data => {
+                pollCount++;
+                if (data.status === 'completed') {
+                    progressStatus.textContent = 'Annotation completed successfully!';
+                    setTimeout(() => {
+                        progressOverlay.style.display = 'none';
+                        loadModelScores(model, element);
+                    }, 1500);
+                } else if (data.status === 'error') {
+                    progressStatus.textContent = 'Error during annotation';
+                    setTimeout(() => {
+                        progressOverlay.style.display = 'none';
+                    }, 1500);
+                } else {
+                    progressStatus.textContent = data.message || `Processing... (${pollCount} checks)`;
+                    setTimeout(checkProgress, 500);
+                }
+            })
+            .catch(error => {
+                console.error('Error checking progress:', error);
+                progressStatus.textContent = `Error checking progress (attempt ${pollCount})`;
+                setTimeout(checkProgress, 2000);
+            });
+    }
+
+    checkProgress();
+}
+
+function loadModelScores(model, element) {
             fetch(`/scores/{{ project }}/${encodeURIComponent(model.annotator_id)}`)
                 .then(response => response.json())
                 .then(scores => {
@@ -750,50 +771,52 @@ addAnnotatorBtn.onclick = () => {
     // Reset form
     isAnnotator.checked = false;
     isJudge.checked = false;
+    document.getElementById('judgeAnnotators').style.display = 'none';
+    document.getElementById('judgeAnnotator1').value = '';
+    document.getElementById('judgeAnnotator2').value = '';
     document.getElementById('newAnnotatorName').value = '';
     document.getElementById('newAnnotatorModel').value = model.model_name;
     document.getElementById('newAnnotatorTemp').value = model.temperature;
     document.getElementById('newAnnotatorPrompt').value = model.prompt;
 };
 
-<!-- Rest of the code remains unchanged -->
-
 saveSettingsBtn.onclick = () => {
-            const columnSettings = {};
-            columnsContainer.querySelectorAll('.column-item').forEach(item => {
-                const columnName = item.querySelector('.column-name').textContent;
-                columnSettings[columnName] = {
-                    show: item.querySelector('.show').classList.contains('active'),
-                    label: item.querySelector('.label').classList.contains('active'),
-                    content: item.querySelector('.content').classList.contains('active'),
-                    filter: item.querySelector('.filter').classList.contains('active')
-                };
-            });
-
-            fetch(`/get_project_settings/{{ project }}`)
-                .then(response => response.json())
-                .then(data => {
-                    const settings = data.settings;
-                    settings.objective = projectObjective.value;
-                    settings.columns = columnSettings;
-
-                    fetch(`/save_project_settings/{{ project }}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(settings)
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            alert('Settings saved successfully!');
-                        } else {
-                            alert('Error saving settings');
-                        }
-                    });
-                });
+    const columnSettings = {};
+    columnsContainer.querySelectorAll('.column-item').forEach(item => {
+        const columnName = item.querySelector('.column-name').textContent;
+        columnSettings[columnName] = {
+            show: item.querySelector('.show').classList.contains('active'),
+            label: item.querySelector('.label').classList.contains('active'),
+            content: item.querySelector('.content').classList.contains('active'),
+            filter: item.querySelector('.filter').classList.contains('active')
         };
+    });
+
+    fetch(`/get_project_settings/{{ project }}`)
+        .then(response => response.json())
+        .then(data => {
+            const settings = data.settings;
+            settings.objective = projectObjective.value;
+            settings.columns = columnSettings;
+
+            fetch(`/save_project_settings/{{ project }}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Settings saved successfully!');
+                } else {
+                    alert('Error saving settings');
+                }
+            });
+        });
+};
+
 
         // Initial load
         function loadSettings() {
@@ -847,4 +870,5 @@ saveSettingsBtn.onclick = () => {
         loadSettings();
     });
 </script>
-
+</body>
+</html>

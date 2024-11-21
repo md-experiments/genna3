@@ -223,20 +223,34 @@ def load_annotations(project, csv_filename):
 @app.route('/annotate/<project>', methods=['POST'])
 def annotate_model(project):
     data = request.json
+    print(data)
     project_annotations_dir = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR)
     os.makedirs(project_annotations_dir, exist_ok=True)
     #print(data)
-    
-
-    annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{data['annotator_id']}_annotation_status.json")
-    if os.path.exists(annotation_status_file):
-        os.remove(annotation_status_file)
-    for i in range(10):
+    if 'selected_annotators' in data:
+        model0 = data['selected_annotators']['first']['id']
+        model1 = data['selected_annotators']['second']['id']
+    def update_status(status, status_update, annotation_status_file):
+        if 'selected_annotators' in data:
+            status['judges'].get(model0, {model1: {}})[model1] = status_update
+        else:
+            status = status_update
         with open(annotation_status_file, 'w') as f:
-            json.dump({'message': f'{int(100*i/10)}% complete', 'status': 'ongoing'}, f, indent=2)
+            json.dump(status, f, indent=2)
+    annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{data['annotator_id']}_annotation_status.json")
+    status_update = {'message': f'Starting...', 'status': 'ongoing'}
+    if os.path.exists(annotation_status_file):
+        with open(annotation_status_file, 'r') as f:
+            status = json.load(f)
+    else:
+        status = {'judges': {model0:{model1: status_update}}} if 'selected_annotators' in data else status_update
+    update_status(status, status_update, annotation_status_file)
+    for i in range(10):
+        status_update = {'message': f'{int(100*i/10)}% complete', 'status': 'ongoing'}
+        update_status(status, status_update, annotation_status_file)
         time.sleep(0.25)
-    with open(annotation_status_file, 'w') as f:
-        json.dump({'status': 'completed'}, f, indent=2)
+    status_update = {'message': f'Completed', 'status': 'completed'}
+    update_status(status, status_update, annotation_status_file)
     return jsonify({'status': 'completed'})
 
 @app.route('/annotation_status/<project>/<annotator_id>')
@@ -245,6 +259,17 @@ def annotation_status(project, annotator_id):
     if os.path.exists(annotation_status_file):
         with open(annotation_status_file, 'r') as f:
             return jsonify(json.load(f))
+    else:
+        return jsonify({'message': f'Starting', 'status': 'ongoing'})
+
+@app.route('/annotation_status/<project>/<annotator_id>/<model_id0>/<model_id1>')
+def annotation_status_judge(project, annotator_id, model_id0, model_id1):
+    annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{annotator_id}_annotation_status.json") 
+    if os.path.exists(annotation_status_file):
+        if ('judges' in json.load(open(annotation_status_file, 'r'))):
+            return jsonify(json.load(open(annotation_status_file, 'r'))['judges'][model_id0][model_id1])
+        else:
+            return jsonify({'message': f'Starting', 'status': 'ongoing'})
     else:
         return jsonify({'message': f'Starting', 'status': 'ongoing'})
 
