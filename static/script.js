@@ -13,24 +13,47 @@ function initDarkMode() {
 }
 
 // Load existing manual annotations
-function loadManualAnnotations(project) {
-    fetch(`/get_manual_annotations/${project}`)
+function loadAnnotations(filename) {
+    const project = document.body.getAttribute('data-project');
+    fetch(`/load_annotations/${project}/${filename}`)
         .then(response => response.json())
         .then(data => {
-            Object.entries(data).forEach(([rowId, annotations]) => {
-                Object.entries(annotations).forEach(([column, value]) => {
-                    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
-                    if (row) {
-                        const cell = Array.from(row.cells).find(cell => 
-                            cell.textContent.trim().startsWith(column)
-                        );
-                        if (cell) {
-                            const btn = cell.querySelector(value ? '.thumbs-up' : '.thumbs-down');
-                            if (btn) btn.classList.add('active');
+            // Handle manual annotations
+            if (data.manual_annotations) {
+                Object.entries(data.manual_annotations).forEach(([rowId, annotations]) => {
+                    Object.entries(annotations).forEach(([column, value]) => {
+                        const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+                        if (row) {
+                            const cells = Array.from(row.cells);
+                            const cell = cells.find(cell => {
+                                const content = cell.textContent.trim();
+                                return content.startsWith(column);
+                            });
+                            if (cell) {
+                                const btn = cell.querySelector(value ? '.thumbs-up' : '.thumbs-down');
+                                if (btn) btn.classList.add('active');
+                            }
                         }
-                    }
+                    });
                 });
-            });
+            }
+
+            // Handle AI annotations
+            if (data.ai_annotations) {
+                Object.entries(data.ai_annotations).forEach(([modelId, modelAnnotations]) => {
+                    Object.entries(modelAnnotations).forEach(([rowId, rowAnnotations]) => {
+                        Object.entries(rowAnnotations).forEach(([column, value]) => {
+                            const element = document.querySelector(
+                                `tr.annotations-row[data-row-id="${rowId}"] ` +
+                                `.annotation-value[data-model="${modelId}"][data-column="${column}"]`
+                            );
+                            if (element) {
+                                element.textContent = value;
+                            }
+                        });
+                    });
+                });
+            }
         });
 }
 
@@ -53,9 +76,11 @@ function toggleAnnotations(rowId) {
 // Set manual label for a cell
 function setLabel(rowId, column, value, project) {
     const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
-    const cell = Array.from(row.cells).find(cell => 
-        cell.textContent.trim().startsWith(column)
-    );
+    const cells = Array.from(row.cells);
+    const cell = cells.find(cell => {
+        const content = cell.textContent.trim();
+        return content.startsWith(column);
+    });
     
     if (cell) {
         const thumbsUp = cell.querySelector('.thumbs-up');
@@ -64,15 +89,22 @@ function setLabel(rowId, column, value, project) {
         thumbsUp.classList.toggle('active', value);
         thumbsDown.classList.toggle('active', !value);
 
-        fetch(`/save_manual_annotation/${project}`, {
+        const filename = document.getElementById('fileSelect').value;
+        if (!filename) return;
+
+        fetch(`/save_annotations/${project}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                row_id: rowId,
-                column: column,
-                value: value
+                project: project,
+                csv_filename: filename,
+                manual_annotations: {
+                    [rowId]: {
+                        [column]: value
+                    }
+                }
             })
         });
     }
@@ -102,9 +134,4 @@ function loadModelAnnotations(project) {
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     initDarkMode();
-    const project = document.body.getAttribute('data-project');
-    if (project) {
-        loadManualAnnotations(project);
-        loadModelAnnotations(project);
-    }
 });

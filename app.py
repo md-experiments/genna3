@@ -54,7 +54,37 @@ def save_project_settings(project_name, settings):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('projects.html')
+
+@app.route('/<project>')
+def project_view(project):
+    settings = get_project_settings(project)
+    columns = get_project_columns(project)
+    
+    # Initialize column settings if they don't exist
+    if 'columns' not in settings:
+        settings['columns'] = {}
+    
+    # Ensure all columns have settings
+    for col in columns:
+        if col not in settings['columns']:
+            settings['columns'][col] = {
+                'show': True,
+                'label': False,
+                'content': False,
+                'filter': False
+            }
+    
+    # Get visible columns
+    visible_columns = [col for col in columns if settings['columns'][col].get('show', True)]
+    
+    return render_template('index.html', 
+                         project=project,
+                         objective=settings.get('objective', ''),
+                         columns=columns,
+                         visible_columns=visible_columns,
+                         column_settings=settings['columns'],
+                         models=settings.get('ai_annotators', []))
 
 @app.route('/settings/<project>')
 def project_settings(project):
@@ -155,13 +185,10 @@ def load_csv(project, filename):
             filtered_row = {k: v for k, v in row.items() if k in visible_columns}
             filtered_data.append(filtered_row)
         
-        # Get categories for filter columns
-        categories = {col: df[col].unique().tolist() for col in filter_columns if col in df.columns}
-        
         return jsonify({
             'data': filtered_data,
             'columns': visible_columns,
-            'categories': categories,
+            'column_settings': settings['columns'],
             'ai_annotators': settings.get('ai_annotators', [])
         })
     return jsonify({'error': 'File not found'})
@@ -169,7 +196,6 @@ def load_csv(project, filename):
 @app.route('/save_annotations', methods=['POST'])
 def save_annotations():
     data = request.json
-    print(data.keys())
     project = data['project']
     csv_filename = data['csv_filename']
     annotations = data['manual_annotations']
@@ -299,6 +325,7 @@ def delete_file():
         return jsonify({'success': True, 'message': 'File and annotations deleted successfully'})
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error deleting file: {str(e)}'})
+
 if __name__ == '__main__':
     os.makedirs(BASE_DIR, exist_ok=True)
     app.run(debug=True, port=5001)
