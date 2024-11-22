@@ -41,9 +41,10 @@ body.dark-mode {
     width: 100%;
 }
 
-.row-annotations .table td {
+.row-annotations td {
     vertical-align: middle;
     padding: 8px;
+    border-top: none;
 }
 
 .model-row {
@@ -56,9 +57,7 @@ body.dark-mode {
     gap: 8px;
     color: var(--text-muted);
     font-size: 0.875rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    padding: 4px;
 }
 
 .model-indicator i {
@@ -69,8 +68,8 @@ body.dark-mode {
 .model-name {
     margin: 0;
     font-size: 0.875rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    color: var(--text-color);
+    font-weight: 500;
 }
 
 .annotation-cell {
@@ -135,13 +134,18 @@ body.dark-mode {
 }
 
 /* Table styles */
+.table {
+    border-color: var(--border-color);
+}
+
 .table > :not(caption) > * > * {
     background-color: var(--bg-color);
     color: var(--text-color);
+    padding: 8px;
 }
 
-.table {
-    border-color: var(--border-color);
+.table td {
+    vertical-align: middle;
 }
 
 /* Form control styles */

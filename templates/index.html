@@ -1,4 +1,4 @@
-<!-- Previous code remains unchanged until renderTableData function -->
+<!-- Previous code remains unchanged until loadAnnotations function -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -110,10 +110,12 @@ function loadFileData(filename) {
             
             headerRow.innerHTML = `
                 <th style="width: 40px;"></th>
+                <th style="width: 150px;">Model</th>
                 ${data.columns.map(col => `<th>${col}</th>`).join('')}
             `;
             
             filterRow.innerHTML = `
+                <th></th>
                 <th></th>
                 ${data.columns.map(col => `
                     <th>
@@ -176,11 +178,12 @@ function renderTableData(data) {
     const tableBody = document.getElementById('tableBody');
     tableBody.innerHTML = data.data.map((row, index) => `
         <tr data-row-id="${index}">
-            <td>
+            <td style="width: 40px;">
                 <button class="expand-row" onclick="toggleAnnotations('${index}')">
                     <i class="bi bi-chevron-right"></i>
                 </button>
             </td>
+            <td style="width: 150px;"></td>
             ${data.columns.map(col => `
                 <td>
                     ${row[col] || ''}
@@ -188,16 +191,17 @@ function renderTableData(data) {
             `).join('')}
         </tr>
         <tr class="annotations-row" style="display: none;" data-row-id="${index}">
-            <td colspan="${data.columns.length + 1}">
+            <td colspan="${data.columns.length + 2}">
                 <div class="row-annotations">
                     <table class="table">
                         <tbody>
                             ${data.ai_annotators.map(model => `
-                                <tr class="model-row" data-model="${model.annotator_id}">
-                                    <td style="width: 40px;">
+                                <tr class="model-row" data-model="${model.annotator_id}" style="display: none;">
+                                    <td style="width: 40px;"></td>
+                                    <td style="width: 150px;">
                                         <span class="model-indicator" title="${model.name}">
                                             <i class="bi bi-robot"></i>
-                                            <small class="model-name">${model.name}</small>
+                                            <span class="model-name">${model.name}</span>
                                         </span>
                                     </td>
                                     ${data.columns.map(col => `
@@ -227,7 +231,89 @@ function renderTableData(data) {
             </td>
         </tr>
     `).join('');
+
+    // Add column header for model name
+    const headerRow = document.querySelector('#tableHeader tr:first-child');
+    if (headerRow) {
+        const modelNameHeader = document.createElement('th');
+        modelNameHeader.style.width = '150px';
+        headerRow.insertBefore(modelNameHeader, headerRow.children[1]);
+    }
+
+    // Add filter input for model name
+    const filterRow = document.querySelector('#tableHeader tr.filter-row');
+    if (filterRow) {
+        const modelNameFilter = document.createElement('th');
+        modelNameFilter.style.width = '150px';
+        filterRow.insertBefore(modelNameFilter, filterRow.children[1]);
+    }
 }
+
+function loadAnnotations(filename) {
+    const project = document.body.getAttribute('data-project');
+    fetch(`/load_annotations/${project}/${filename}`)
+        .then(response => response.json())
+        .then(data => {
+            // Handle AI annotations first
+            if (data.ai_annotations) {
+                Object.entries(data.ai_annotations).forEach(([modelId, modelAnnotations]) => {
+                    Object.entries(modelAnnotations).forEach(([rowId, rowAnnotations]) => {
+                        // Only show model row if it has annotations for this row
+                        if (Object.keys(rowAnnotations).length > 0) {
+                            const modelRow = document.querySelector(
+                                `tr.annotations-row[data-row-id="${rowId}"] .model-row[data-model="${modelId}"]`
+                            );
+                            if (modelRow) {
+                                modelRow.style.display = 'table-row';
+                                
+                                Object.entries(rowAnnotations).forEach(([column, value]) => {
+                                    const headerCells = document.querySelector('#tableHeader tr:first-child').cells;
+                                    const columnIndex = Array.from(headerCells).findIndex(cell => cell.textContent.trim() === column);
+                                    if (columnIndex !== -1) {
+                                        // Add 2 to account for expand button and model name columns
+                                        const cell = modelRow.cells[columnIndex];
+                                        if (cell) {
+                                            const valueSpan = cell.querySelector('.annotation-value');
+                                            if (valueSpan) {
+                                                valueSpan.textContent = value;
+                                                valueSpan.style.display = 'inline-block';
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                });
+            }
+
+            // Handle manual annotations
+            if (data.manual_annotations) {
+                Object.entries(data.manual_annotations).forEach(([rowId, annotations]) => {
+                    Object.entries(annotations).forEach(([column, value]) => {
+                        if (value.model_id) {
+                            const modelRow = document.querySelector(
+                                `tr.annotations-row[data-row-id="${rowId}"] .model-row[data-model="${value.model_id}"]`
+                            );
+                            if (modelRow) {
+                                const headerCells = document.querySelector('#tableHeader tr:first-child').cells;
+                                const columnIndex = Array.from(headerCells).findIndex(cell => cell.textContent.trim() === column);
+                                if (columnIndex !== -1) {
+                                    // Add 2 to account for expand button and model name columns
+                                    const cell = modelRow.cells[columnIndex];
+                                    if (cell) {
+                                        const btn = cell.querySelector(value ? '.thumbs-up' : '.thumbs-down');
+                                        if (btn) btn.classList.add('active');
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+            }
+        });
+}
+
 // Upload file
 function uploadFile(input) {
             if (!input.files.length) return;
@@ -303,68 +389,6 @@ function uploadFile(input) {
             }
         }
 
-        
-function loadAnnotations(filename) {
-    const project = document.body.getAttribute('data-project');
-    fetch(`/load_annotations/${project}/${filename}`)
-        .then(response => response.json())
-        .then(data => {
-            // Handle manual annotations
-            if (data.manual_annotations) {
-                Object.entries(data.manual_annotations).forEach(([rowId, annotations]) => {
-                    Object.entries(annotations).forEach(([column, value]) => {
-                        const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
-                        if (row) {
-                            const headerCells = document.querySelector('#tableHeader tr:first-child').cells;
-                            const columnIndex = Array.from(headerCells).findIndex(cell => cell.textContent.trim() === column);
-                            if (columnIndex !== -1) {
-                                const cell = row.cells[columnIndex];
-                                if (cell) {
-                                    const btn = cell.querySelector(value ? '.thumbs-up' : '.thumbs-down');
-                                    if (btn) btn.classList.add('active');
-                                }
-                            }
-                        }
-                    });
-                });
-            }
-
-            // Handle AI annotations
-            if (data.ai_annotations) {
-                Object.entries(data.ai_annotations).forEach(([modelId, modelAnnotations]) => {
-                    const modelRows = document.querySelectorAll(`.model-row[data-model="${modelId}"]`);
-                    modelRows.forEach(modelRow => {
-                        const rowId = modelRow.closest('.annotations-row').getAttribute('data-row-id');
-                        const rowAnnotations = modelAnnotations[rowId];
-                        
-                        if (rowAnnotations) {
-                            // Show the model row if it has annotations
-                            modelRow.style.display = 'table-row';
-                            
-                            Object.entries(rowAnnotations).forEach(([column, value]) => {
-                                const headerCells = document.querySelector('#tableHeader tr:first-child').cells;
-                                const columnIndex = Array.from(headerCells).findIndex(cell => cell.textContent.trim() === column);
-                                if (columnIndex !== -1) {
-                                    const cell = modelRow.cells[columnIndex];
-                                    if (cell) {
-                                        const valueSpan = cell.querySelector('.annotation-value');
-                                        if (valueSpan) {
-                                            valueSpan.textContent = value;
-                                            valueSpan.style.display = 'inline-block';
-                                        }
-                                    }
-                                }
-                            });
-                        } else {
-                            // Hide the model row if it has no annotations
-                            modelRow.style.display = 'none';
-                        }
-                    });
-                });
-            }
-        });
-}
-
 // Set label
 function setLabel(rowId, column, value, modelId) {
     const project = document.body.getAttribute('data-project');
@@ -374,11 +398,12 @@ function setLabel(rowId, column, value, modelId) {
     const row = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"] .model-row[data-model="${modelId}"]`);
     if (!row) return;
 
-    // Find the cell by column index
+    // Find the cell by column index, accounting for expand and model name columns
     const headerCells = document.querySelector('#tableHeader tr:first-child').cells;
     const columnIndex = Array.from(headerCells).findIndex(cell => cell.textContent.trim() === column);
     if (columnIndex === -1) return;
 
+    // Add 2 to account for expand button and model name columns
     const cell = row.cells[columnIndex];
     if (!cell) return;
 
