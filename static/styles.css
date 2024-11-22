@@ -142,20 +142,40 @@ body.dark-mode {
     color: var(--text-color);
 }
 
+.filter-row th {
+    padding: 4px;
+}
+
+.filter-row .form-control {
+    font-size: 0.875rem;
+    padding: 4px 8px;
+    height: auto;
+}
+
+.filter-row .form-control:focus {
+    box-shadow: none;
+    border-color: var(--border-color);
+}
+
+.filter-row .form-control::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
 /* Dark mode specific overrides */
-.dark-mode .form-control,
-.dark-mode .form-select {
+.dark-mode .filter-row .form-control {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+.dark-mode .filter-row .form-control:focus {
     background-color: var(--bg-color);
     color: var(--text-color);
 }
 
-.dark-mode .form-control:focus,
-.dark-mode .form-select:focus {
-    background-color: var(--bg-color);
-    color: var(--text-color);
+.dark-mode .filter-row .form-control::placeholder {
+    color: var(--text-muted);
 }
 
-.dark-mode .modal-content {
-    background-color: var(--bg-color);
-    color: var(--text-color);
-}
+/* Rest of the styles remain unchanged */

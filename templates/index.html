@@ -1,3 +1,4 @@
+<!-- Previous code remains unchanged until the table -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -47,21 +48,26 @@
             </div>
         </div>
 
-        <div id="dataContainer" style="display: none;">
-            <div class="table-responsive">
-                <table class="table">
-                    <thead id="tableHeader">
-                        <!-- Column headers will be added here -->
-                    </thead>
-                    <tbody id="tableBody">
-                        <!-- Data rows will be added here -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
+<div id="dataContainer" style="display: none;">
+    <div class="table-responsive">
+        <table class="table">
+            <thead id="tableHeader">
+                <tr>
+                    <th style="width: 40px;"></th>
+                    <!-- Column headers will be added here -->
+                </tr>
+                <tr class="filter-row">
+                    <th></th>
+                    <!-- Filter inputs will be added here -->
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <!-- Data rows will be added here -->
+            </tbody>
+        </table>
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Load file list
         function loadFiles() {
@@ -85,52 +91,112 @@
                 document.getElementById('dataContainer').style.display = 'none';
             }
         });
-
+        
         // Load file data
-        function loadFileData(filename) {
-            const project = document.body.getAttribute('data-project');
-            fetch(`/load_csv/${project}/${filename}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        alert(data.error);
-                        return;
-                    }
+function loadFileData(filename) {
+    const project = document.body.getAttribute('data-project');
+    fetch(`/load_csv/${project}/${filename}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
 
-                    // Create header row
-                    const headerRow = document.createElement('tr');
-                    headerRow.innerHTML = `
-                        <th style="width: 40px;"></th>
-                        ${data.columns.map(col => `<th>${col}</th>`).join('')}
-                    `;
-                    document.getElementById('tableHeader').innerHTML = '';
-                    document.getElementById('tableHeader').appendChild(headerRow);
+            // Create header and filter rows
+            const headerRow = document.createElement('tr');
+            const filterRow = document.createElement('tr');
+            filterRow.className = 'filter-row';
+            
+            headerRow.innerHTML = `
+                <th style="width: 40px;"></th>
+                ${data.columns.map(col => `<th>${col}</th>`).join('')}
+            `;
+            
+            filterRow.innerHTML = `
+                <th></th>
+                ${data.columns.map(col => `
+                    <th>
+                        <input type="text" class="form-control form-control-sm column-filter" 
+                               data-column="${col}" placeholder="Filter ${col}...">
+                    </th>
+                `).join('')}
+            `;
 
-                    // Create data rows
-                    const tableBody = document.getElementById('tableBody');
-                    tableBody.innerHTML = data.data.map((row, index) => `
-                        <tr data-row-id="${index}">
-                            <td>
-                                <button class="expand-row" onclick="toggleAnnotations('${index}')">
-                                    <i class="bi bi-chevron-right"></i>
-                                </button>
-                            </td>
-                            ${data.columns.map(col => `
-                                <td>
-                                    ${row[col] || ''}
-                                    ${data.column_settings?.[col]?.label ? `
-                                        <div class="label-actions">
-                                            <button class="label-btn thumbs-up" onclick="setLabel('${index}', '${col}', true)" title="Correct">
-                                                <i class="bi bi-hand-thumbs-up"></i>
-                                            </button>
-                                            <button class="label-btn thumbs-down" onclick="setLabel('${index}', '${col}', false)" title="Incorrect">
-                                                <i class="bi bi-hand-thumbs-down"></i>
-                                            </button>
-                                        </div>
-                                    ` : ''}
-                                </td>
-                            `).join('')}
-                        </tr>
+            const thead = document.getElementById('tableHeader');
+            thead.innerHTML = '';
+            thead.appendChild(headerRow);
+            thead.appendChild(filterRow);
+
+            // Store the original data for filtering
+            window.originalData = data.data;
+            
+            // Create data rows
+            renderTableData(data);
+
+            document.getElementById('dataContainer').style.display = 'block';
+            loadAnnotations(filename);
+
+            // Add filter event listeners
+            document.querySelectorAll('.column-filter').forEach(input => {
+                input.addEventListener('input', filterData);
+            });
+        });
+}
+
+function filterData() {
+    const filters = {};
+    document.querySelectorAll('.column-filter').forEach(input => {
+        const value = input.value.trim().toLowerCase();
+        if (value) {
+            filters[input.dataset.column] = value;
+        }
+    });
+
+    const filteredData = window.originalData.filter(row => {
+        return Object.entries(filters).every(([column, filterValue]) => {
+            const cellValue = String(row[column] || '').toLowerCase();
+            return cellValue.includes(filterValue);
+        });
+    });
+
+    renderTableData({ 
+        data: filteredData, 
+        columns: window.originalData.length > 0 ? Object.keys(window.originalData[0]) : [],
+        column_settings: window.lastColumnSettings,
+        ai_annotators: window.lastAnnotators
+    });
+}
+
+function renderTableData(data) {
+    // Store settings for reuse
+    window.lastColumnSettings = data.column_settings;
+    window.lastAnnotators = data.ai_annotators;
+
+    const tableBody = document.getElementById('tableBody');
+    tableBody.innerHTML = data.data.map((row, index) => `
+        <tr data-row-id="${index}">
+            <td>
+                <button class="expand-row" onclick="toggleAnnotations('${index}')">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </td>
+            ${data.columns.map(col => `
+                <td>
+                    ${row[col] || ''}
+                    ${data.column_settings?.[col]?.label ? `
+                        <div class="label-actions">
+                            <button class="label-btn thumbs-up" onclick="setLabel('${index}', '${col}', true)" title="Correct">
+                                <i class="bi bi-hand-thumbs-up"></i>
+                            </button>
+                            <button class="label-btn thumbs-down" onclick="setLabel('${index}', '${col}', false)" title="Incorrect">
+                                <i class="bi bi-hand-thumbs-down"></i>
+                            </button>
+                        </div>
+                    ` : ''}
+                </td>
+            `).join('')}
+        </tr>
         <tr class="annotations-row" style="display: none;" data-row-id="${index}">
             <td colspan="${data.columns.length + 1}">
                 <div class="row-annotations">
@@ -159,12 +225,8 @@
                 </div>
             </td>
         </tr>
-`).join('');
-
-                    document.getElementById('dataContainer').style.display = 'block';
-                    loadAnnotations(filename);
-                });
-        }
+    `).join('');
+}
 
         // Upload file
         function uploadFile(input) {
