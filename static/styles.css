@@ -27,6 +27,24 @@ body.dark-mode {
     color: var(--text-color) !important;
 }
 
+/* Table styles */
+.table {
+    border-color: var(--border-color);
+    table-layout: fixed;
+    width: 100%;
+}
+
+.table > :not(caption) > * > * {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    padding: 8px;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* Row annotations */
 .row-annotations {
     background-color: var(--bg-color);
     border: 1px solid var(--border-color);
@@ -37,16 +55,16 @@ body.dark-mode {
 
 .row-annotations .table {
     margin: 0;
-    table-layout: fixed;
-    width: 100%;
+    border: none;
 }
 
 .row-annotations td {
-    vertical-align: middle;
-    padding: 8px;
     border-top: none;
+    padding: 8px;
+    vertical-align: middle;
 }
 
+/* Model row */
 .model-row {
     background-color: var(--bg-color);
 }
@@ -70,8 +88,12 @@ body.dark-mode {
     font-size: 0.875rem;
     color: var(--text-color);
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
+/* Annotation cell */
 .annotation-cell {
     display: flex;
     flex-direction: column;
@@ -90,8 +112,9 @@ body.dark-mode {
     word-break: break-word;
 }
 
+/* Label actions */
 .label-actions {
-    display: flex;
+    display: none;
     gap: 8px;
     margin-top: 4px;
 }
@@ -116,6 +139,7 @@ body.dark-mode {
     color: #dc3545;
 }
 
+/* Expand button */
 .expand-row {
     cursor: pointer;
     padding: 4px;
@@ -133,35 +157,7 @@ body.dark-mode {
     color: var(--text-color);
 }
 
-/* Table styles */
-.table {
-    border-color: var(--border-color);
-}
-
-.table > :not(caption) > * > * {
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    padding: 8px;
-}
-
-.table td {
-    vertical-align: middle;
-}
-
-/* Form control styles */
-.form-control,
-.form-select {
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    border-color: var(--border-color);
-}
-
-.form-control:focus,
-.form-select:focus {
-    background-color: var(--bg-color);
-    color: var(--text-color);
-}
-
+/* Filter row */
 .filter-row th {
     padding: 4px;
 }
@@ -182,7 +178,21 @@ body.dark-mode {
     opacity: 0.7;
 }
 
-/* Dark mode specific overrides */
+/* Form controls */
+.form-control,
+.form-select {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+/* Dark mode overrides */
 .dark-mode .form-control,
 .dark-mode .form-select {
     background-color: var(--bg-color);

@@ -1,4 +1,4 @@
-<!-- Previous code remains unchanged until loadAnnotations function -->
+<!-- Previous code remains unchanged until renderTableData function -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -68,31 +68,39 @@
     </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Load file list
-        function loadFiles() {
-            const project = document.body.getAttribute('data-project');
-            fetch(`/get_project_files/${project}`)
-                .then(response => response.json())
-                .then(files => {
-                    const fileSelect = document.getElementById('fileSelect');
-                    fileSelect.innerHTML = '<option value="">Select a file...</option>' +
-                        files.map(file => `<option value="${file}">${file}</option>`).join('');
-                });
+<script>
+    // File selection handler - defined before loadFiles
+    const fileSelect = document.getElementById('fileSelect');
+    fileSelect.addEventListener('change', function() {
+        const filename = this.value;
+        document.getElementById('deleteBtn').style.display = filename ? 'block' : 'none';
+        if (filename) {
+            document.getElementById('dataContainer').style.display = 'none'; // Hide current data
+            loadFileData(filename);
+        } else {
+            document.getElementById('dataContainer').style.display = 'none';
+        }
+    });
+
+    // Load file list
+    function loadFiles() {
+        const project = document.body.getAttribute('data-project');
+        fetch(`/get_project_files/${project}`)
+            .then(response => response.json())
+            .then(files => {
+                fileSelect.innerHTML = '<option value="">Select a file...</option>' +
+                    files.map(file => `<option value="${file}">${file}</option>`).join('');
+                
+                // Auto-load first file if available
+                if (files.length > 0) {
+                    fileSelect.value = files[0];
+                    document.getElementById('deleteBtn').style.display = 'block';
+                    loadFileData(files[0]);
+                }
+            });
         }
 
-        // File selection handler
-        document.getElementById('fileSelect').addEventListener('change', function() {
-            const filename = this.value;
-            document.getElementById('deleteBtn').style.display = filename ? 'block' : 'none';
-            if (filename) {
-                loadFileData(filename);
-            } else {
-                document.getElementById('dataContainer').style.display = 'none';
-            }
-        });
-        
-        // Load file data
+// Load file data
 function loadFileData(filename) {
     const project = document.body.getAttribute('data-project');
     fetch(`/load_csv/${project}/${filename}`)
@@ -109,7 +117,7 @@ function loadFileData(filename) {
             filterRow.className = 'filter-row';
             
             headerRow.innerHTML = `
-                <th style="width: 40px;"></th>
+                <th style="width: 40px;">Actions</th>
                 <th style="width: 150px;">Model</th>
                 ${data.columns.map(col => `<th>${col}</th>`).join('')}
             `;
@@ -143,6 +151,10 @@ function loadFileData(filename) {
             document.querySelectorAll('.column-filter').forEach(input => {
                 input.addEventListener('input', filterData);
             });
+        })
+        .catch(error => {
+            console.error('Error loading file:', error);
+            alert('Error loading file. Please try again.');
         });
 }
 
@@ -155,7 +167,10 @@ function filterData() {
         }
     });
 
-    const filteredData = window.originalData.filter(row => {
+    const filteredData = window.originalData.map((row, index) => ({
+        ...row,
+        original_index: index // Preserve original index
+    })).filter(row => {
         return Object.entries(filters).every(([column, filterValue]) => {
             const cellValue = String(row[column] || '').toLowerCase();
             return cellValue.includes(filterValue);
@@ -168,6 +183,12 @@ function filterData() {
         column_settings: window.lastColumnSettings,
         ai_annotators: window.lastAnnotators
     });
+
+    // Reload annotations for filtered data
+    const filename = document.getElementById('fileSelect').value;
+    if (filename) {
+        loadAnnotations(filename);
+    }
 }
 
 function renderTableData(data) {
@@ -176,79 +197,71 @@ function renderTableData(data) {
     window.lastAnnotators = data.ai_annotators;
 
     const tableBody = document.getElementById('tableBody');
-    tableBody.innerHTML = data.data.map((row, index) => `
-        <tr data-row-id="${index}">
-            <td style="width: 40px;">
-                <button class="expand-row" onclick="toggleAnnotations('${index}')">
-                    <i class="bi bi-chevron-right"></i>
-                </button>
-            </td>
-            <td style="width: 150px;"></td>
-            ${data.columns.map(col => `
-                <td>
-                    ${row[col] || ''}
+    tableBody.innerHTML = data.data.map((row, index) => {
+        // Use original index from data if available, otherwise use current index
+        const rowId = row.original_index !== undefined ? row.original_index : index;
+        return `
+            <tr data-row-id="${rowId}">
+                <td style="width: 40px;">
+                    <button class="expand-row" onclick="toggleAnnotations('${rowId}')">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
                 </td>
-            `).join('')}
-        </tr>
-        <tr class="annotations-row" style="display: none;" data-row-id="${index}">
-            <td colspan="${data.columns.length + 2}">
-                <div class="row-annotations">
-                    <table class="table">
-                        <tbody>
-                            ${data.ai_annotators.map(model => `
-                                <tr class="model-row" data-model="${model.annotator_id}" style="display: none;">
-                                    <td style="width: 40px;"></td>
-                                    <td style="width: 150px;">
-                                        <span class="model-indicator" title="${model.name}">
-                                            <i class="bi bi-robot"></i>
-                                            <span class="model-name">${model.name}</span>
-                                        </span>
-                                    </td>
-                                    ${data.columns.map(col => `
-                                        <td>
-                                            ${data.column_settings?.[col]?.label ? `
-                                                <div class="annotation-cell">
-                                                    <span class="annotation-value" data-model="${model.annotator_id}" data-column="${col}">
-                                                        Not annotated
-                                                    </span>
-                                                    <div class="label-actions">
-                                                        <button class="label-btn thumbs-up" onclick="setLabel('${index}', '${col}', true, '${model.annotator_id}')" title="Correct">
-                                                            <i class="bi bi-hand-thumbs-up"></i>
-                                                        </button>
-                                                        <button class="label-btn thumbs-down" onclick="setLabel('${index}', '${col}', false, '${model.annotator_id}')" title="Incorrect">
-                                                            <i class="bi bi-hand-thumbs-down"></i>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ` : ''}
+                <td style="width: 150px;"></td>
+                ${data.columns.map(col => `
+                    <td>
+                        ${row[col] || ''}
+                    </td>
+                `).join('')}
+            </tr>
+            <tr class="annotations-row" style="display: none;" data-row-id="${rowId}">
+                <td colspan="${data.columns.length + 2}">
+                    <div class="row-annotations">
+                        <table class="table" style="table-layout: fixed;">
+                            <colgroup>
+                                <col style="width: 40px;">
+                                <col style="width: 150px;">
+                                ${data.columns.map(() => `<col>`).join('')}
+                            </colgroup>
+                            <tbody>
+                                ${data.ai_annotators.map(model => `
+                                    <tr class="model-row" data-model="${model.annotator_id}" style="display: none;">
+                                        <td style="width: 40px;"></td>
+                                        <td style="width: 150px;">
+                                            <div class="model-indicator" title="${model.name}">
+                                                <i class="bi bi-robot"></i>
+                                                <div class="model-name">${model.name}</div>
+                                            </div>
                                         </td>
-                                    `).join('')}
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </td>
-        </tr>
-    `).join('');
-
-    // Add column header for model name
-    const headerRow = document.querySelector('#tableHeader tr:first-child');
-    if (headerRow) {
-        const modelNameHeader = document.createElement('th');
-        modelNameHeader.style.width = '150px';
-        headerRow.insertBefore(modelNameHeader, headerRow.children[1]);
-    }
-
-    // Add filter input for model name
-    const filterRow = document.querySelector('#tableHeader tr.filter-row');
-    if (filterRow) {
-        const modelNameFilter = document.createElement('th');
-        modelNameFilter.style.width = '150px';
-        filterRow.insertBefore(modelNameFilter, filterRow.children[1]);
-    }
+                                        ${data.columns.map(col => `
+                                            <td>
+                                                ${data.column_settings?.[col]?.label ? `
+                                                    <div class="annotation-cell">
+                                                        <span class="annotation-value" data-model="${model.annotator_id}" data-column="${col}">
+                                                            Not annotated
+                                                        </span>
+                                                        <div class="label-actions" style="display: none;">
+                                                            <button class="label-btn thumbs-up" onclick="setLabel('${rowId}', '${col}', true, '${model.annotator_id}')" title="Correct">
+                                                                <i class="bi bi-hand-thumbs-up"></i>
+                                                            </button>
+                                                            <button class="label-btn thumbs-down" onclick="setLabel('${rowId}', '${col}', false, '${model.annotator_id}')" title="Incorrect">
+                                                                <i class="bi bi-hand-thumbs-down"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ` : ''}
+                                            </td>
+                                        `).join('')}
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
-
 function loadAnnotations(filename) {
     const project = document.body.getAttribute('data-project');
     fetch(`/load_annotations/${project}/${filename}`)
@@ -267,16 +280,24 @@ function loadAnnotations(filename) {
                                 modelRow.style.display = 'table-row';
                                 
                                 Object.entries(rowAnnotations).forEach(([column, value]) => {
-                                    const headerCells = document.querySelector('#tableHeader tr:first-child').cells;
-                                    const columnIndex = Array.from(headerCells).findIndex(cell => cell.textContent.trim() === column);
+                                    // Find the column index in the main table
+                                    const mainHeaderCells = document.querySelector('#tableHeader tr:first-child').cells;
+                                    const columnIndex = Array.from(mainHeaderCells).findIndex(cell => cell.textContent.trim() === column);
+                                    
                                     if (columnIndex !== -1) {
-                                        // Add 2 to account for expand button and model name columns
-                                        const cell = modelRow.cells[columnIndex];
-                                        if (cell) {
-                                            const valueSpan = cell.querySelector('.annotation-value');
+                                        // Map main table index to nested table index
+                                        const targetCell = modelRow.cells[columnIndex];
+                                        
+                                        if (targetCell) {
+                                            const valueSpan = targetCell.querySelector('.annotation-value');
+                                            const labelActions = targetCell.querySelector('.label-actions');
                                             if (valueSpan) {
                                                 valueSpan.textContent = value;
                                                 valueSpan.style.display = 'inline-block';
+                                                // Only show thumbs up/down if there's an annotation
+                                                if (labelActions) {
+                                                    labelActions.style.display = 'flex';
+                                                }
                                             }
                                         }
                                     }
@@ -296,13 +317,16 @@ function loadAnnotations(filename) {
                                 `tr.annotations-row[data-row-id="${rowId}"] .model-row[data-model="${value.model_id}"]`
                             );
                             if (modelRow) {
-                                const headerCells = document.querySelector('#tableHeader tr:first-child').cells;
-                                const columnIndex = Array.from(headerCells).findIndex(cell => cell.textContent.trim() === column);
+                                // Find the column index in the main table
+                                const mainHeaderCells = document.querySelector('#tableHeader tr:first-child').cells;
+                                const columnIndex = Array.from(mainHeaderCells).findIndex(cell => cell.textContent.trim() === column);
+                                
                                 if (columnIndex !== -1) {
-                                    // Add 2 to account for expand button and model name columns
-                                    const cell = modelRow.cells[columnIndex];
-                                    if (cell) {
-                                        const btn = cell.querySelector(value ? '.thumbs-up' : '.thumbs-down');
+                                    // Map main table index to nested table index
+                                    const targetCell = modelRow.cells[columnIndex];
+                                    
+                                    if (targetCell) {
+                                        const btn = targetCell.querySelector(value ? '.thumbs-up' : '.thumbs-down');
                                         if (btn) btn.classList.add('active');
                                     }
                                 }
@@ -313,6 +337,7 @@ function loadAnnotations(filename) {
             }
         });
 }
+
 
 // Upload file
 function uploadFile(input) {
@@ -388,7 +413,7 @@ function uploadFile(input) {
                 annotationsRow.style.display = 'none';
             }
         }
-
+        
 // Set label
 function setLabel(rowId, column, value, modelId) {
     const project = document.body.getAttribute('data-project');
@@ -398,12 +423,12 @@ function setLabel(rowId, column, value, modelId) {
     const row = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"] .model-row[data-model="${modelId}"]`);
     if (!row) return;
 
-    // Find the cell by column index, accounting for expand and model name columns
+    // Find the column index in the main table
     const headerCells = document.querySelector('#tableHeader tr:first-child').cells;
     const columnIndex = Array.from(headerCells).findIndex(cell => cell.textContent.trim() === column);
     if (columnIndex === -1) return;
 
-    // Add 2 to account for expand button and model name columns
+    // Map main table index to nested table index
     const cell = row.cells[columnIndex];
     if (!cell) return;
 
