@@ -131,26 +131,35 @@
                                 </td>
                             `).join('')}
                         </tr>
-                        <tr class="annotations-row" style="display: none;" data-row-id="${index}">
-                            <td colspan="${data.columns.length + 1}">
-                                <div class="row-annotations">
-                                    ${data.ai_annotators.map(model => `
-                                        <div class="model-annotation">
-                                            <div class="model-name">${model.name}</div>
-                                            ${data.columns.filter(col => data.column_settings?.[col]?.label).map(col => `
-                                                <div class="annotation-label">
-                                                    <strong>${col}:</strong>
-                                                    <span class="annotation-value" data-model="${model.annotator_id}" data-column="${col}">
-                                                        Not annotated
-                                                    </span>
-                                                </div>
-                                            `).join('')}
-                                        </div>
+        <tr class="annotations-row" style="display: none;" data-row-id="${index}">
+            <td colspan="${data.columns.length + 1}">
+                <div class="row-annotations">
+                    <table class="table">
+                        <tbody>
+                            ${data.ai_annotators.map(model => `
+                                <tr class="model-row" data-model="${model.annotator_id}">
+                                    <td style="width: 40px;">
+                                        <span class="model-indicator">
+                                            <i class="bi bi-robot"></i>
+                                        </span>
+                                    </td>
+                                    ${data.columns.map(col => `
+                                        <td>
+                                            ${data.column_settings?.[col]?.label ? `
+                                                <span class="annotation-value" data-model="${model.annotator_id}" data-column="${col}">
+                                                    Not annotated
+                                                </span>
+                                            ` : ''}
+                                        </td>
                                     `).join('')}
-                                </div>
-                            </td>
-                        </tr>
-                    `).join('');
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </td>
+        </tr>
+`).join('');
 
                     document.getElementById('dataContainer').style.display = 'block';
                     loadAnnotations(filename);

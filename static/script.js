@@ -1,23 +1,44 @@
-// Dark mode handling
-function initDarkMode() {
-    const modeSwitch = document.getElementById('modeSwitch');
-    if (localStorage.getItem('darkMode') === 'true') {
-        document.body.classList.add('dark-mode');
-        modeSwitch.checked = true;
-    }
-
-    modeSwitch.addEventListener('change', () => {
-        document.body.classList.toggle('dark-mode');
-        localStorage.setItem('darkMode', modeSwitch.checked);
-    });
-}
-
-// Load existing manual annotations
+// Load annotations
 function loadAnnotations(filename) {
     const project = document.body.getAttribute('data-project');
     fetch(`/load_annotations/${project}/${filename}`)
         .then(response => response.json())
         .then(data => {
+            // Handle AI annotations first to determine which models to show
+            if (data.ai_annotations) {
+                const modelRows = document.querySelectorAll('.model-row');
+                modelRows.forEach(row => {
+                    const modelId = row.getAttribute('data-model');
+                    const modelAnnotations = data.ai_annotations[modelId];
+                    
+                    // Hide model row by default
+                    row.style.display = 'none';
+                    
+                    // Only show model row if it has annotations for this row
+                    if (modelAnnotations) {
+                        Object.entries(modelAnnotations).forEach(([rowId, rowAnnotations]) => {
+                            if (Object.keys(rowAnnotations).length > 0) {
+                                const annotationRow = row.closest('tr.annotations-row');
+                                if (annotationRow && annotationRow.getAttribute('data-row-id') === rowId) {
+                                    row.style.display = 'table-row';
+                                    
+                                    // Update annotation values
+                                    Object.entries(rowAnnotations).forEach(([column, value]) => {
+                                        const element = row.querySelector(
+                                            `.annotation-value[data-model="${modelId}"][data-column="${column}"]`
+                                        );
+                                        if (element) {
+                                            element.textContent = value;
+                                            element.style.display = 'inline-block';
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+
             // Handle manual annotations
             if (data.manual_annotations) {
                 Object.entries(data.manual_annotations).forEach(([rowId, annotations]) => {
@@ -25,10 +46,7 @@ function loadAnnotations(filename) {
                         const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
                         if (row) {
                             const cells = Array.from(row.cells);
-                            const cell = cells.find(cell => {
-                                const content = cell.textContent.trim();
-                                return content.startsWith(column);
-                            });
+                            const cell = cells.find(cell => cell.textContent.trim().startsWith(column));
                             if (cell) {
                                 const btn = cell.querySelector(value ? '.thumbs-up' : '.thumbs-down');
                                 if (btn) btn.classList.add('active');
@@ -37,27 +55,10 @@ function loadAnnotations(filename) {
                     });
                 });
             }
-
-            // Handle AI annotations
-            if (data.ai_annotations) {
-                Object.entries(data.ai_annotations).forEach(([modelId, modelAnnotations]) => {
-                    Object.entries(modelAnnotations).forEach(([rowId, rowAnnotations]) => {
-                        Object.entries(rowAnnotations).forEach(([column, value]) => {
-                            const element = document.querySelector(
-                                `tr.annotations-row[data-row-id="${rowId}"] ` +
-                                `.annotation-value[data-model="${modelId}"][data-column="${column}"]`
-                            );
-                            if (element) {
-                                element.textContent = value;
-                            }
-                        });
-                    });
-                });
-            }
         });
 }
 
-// Toggle row annotations visibility
+// Toggle annotations
 function toggleAnnotations(rowId) {
     const button = document.querySelector(`tr[data-row-id="${rowId}"] .expand-row i`);
     const annotationsRow = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"]`);
@@ -73,14 +74,15 @@ function toggleAnnotations(rowId) {
     }
 }
 
-// Set manual label for a cell
-function setLabel(rowId, column, value, project) {
+// Set label
+function setLabel(rowId, column, value) {
+    const project = document.body.getAttribute('data-project');
+    const filename = document.getElementById('fileSelect').value;
+    if (!filename) return;
+
     const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
     const cells = Array.from(row.cells);
-    const cell = cells.find(cell => {
-        const content = cell.textContent.trim();
-        return content.startsWith(column);
-    });
+    const cell = cells.find(cell => cell.textContent.trim().startsWith(column));
     
     if (cell) {
         const thumbsUp = cell.querySelector('.thumbs-up');
@@ -88,9 +90,6 @@ function setLabel(rowId, column, value, project) {
         
         thumbsUp.classList.toggle('active', value);
         thumbsDown.classList.toggle('active', !value);
-
-        const filename = document.getElementById('fileSelect').value;
-        if (!filename) return;
 
         fetch(`/save_annotations/${project}`, {
             method: 'POST',
@@ -110,28 +109,14 @@ function setLabel(rowId, column, value, project) {
     }
 }
 
-// Load model annotations
-function loadModelAnnotations(project) {
-    fetch(`/get_model_annotations/${project}`)
-        .then(response => response.json())
-        .then(data => {
-            Object.entries(data).forEach(([modelId, modelAnnotations]) => {
-                Object.entries(modelAnnotations).forEach(([rowId, rowAnnotations]) => {
-                    Object.entries(rowAnnotations).forEach(([column, value]) => {
-                        const element = document.querySelector(
-                            `tr.annotations-row[data-row-id="${rowId}"] ` +
-                            `.annotation-value[data-model="${modelId}"][data-column="${column}"]`
-                        );
-                        if (element) {
-                            element.textContent = value;
-                        }
-                    });
-                });
-            });
-        });
+// Initialize dark mode
+const modeSwitch = document.getElementById('modeSwitch');
+if (localStorage.getItem('darkMode') === 'true') {
+    document.body.classList.add('dark-mode');
+    modeSwitch.checked = true;
 }
 
-// Initialize everything when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    initDarkMode();
+modeSwitch.addEventListener('change', () => {
+    document.body.classList.toggle('dark-mode');
+    localStorage.setItem('darkMode', modeSwitch.checked);
 });
