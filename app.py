@@ -5,7 +5,7 @@ import os
 import yaml
 from collections import OrderedDict
 import time
-
+from src.utils import log_traceback
 app = Flask(__name__)
 
 BASE_DIR = 'data'
@@ -193,28 +193,36 @@ def load_csv(project, filename):
         })
     return jsonify({'error': 'File not found'})
 
-@app.route('/save_annotations', methods=['POST'])
-def save_annotations():
+@app.route('/save_annotations/<project>', methods=['POST'])
+def save_annotations(project):
     data = request.json
-    project = data['project']
+    #project = data['project']
+    print(data)
     csv_filename = data['csv_filename']
     annotations = data['manual_annotations']
-    
-    annotation_data = {
-        'manual_annotations': annotations,
-        'ai_annotations': data.get('ai_annotations', {}),
+        
+    annotation_filename = f"{os.path.splitext(csv_filename)[0]}_annotations.json"
+    project_annotations_dir = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR)
+    os.makedirs(project_annotations_dir, exist_ok=True)
+    if os.path.exists(os.path.join(project_annotations_dir, annotation_filename)):
+        with open(os.path.join(project_annotations_dir, annotation_filename), 'r') as f:
+            annotation_data = json.load(f)
+    else:
+        annotation_data = {
+        'manual_annotations': {},
+        'ai_annotations': {},
         'metadata': {
             'last_updated': pd.Timestamp.now().isoformat(),
             'version': '2.0'
         }
     }
-    
-    annotation_filename = f"{os.path.splitext(csv_filename)[0]}_annotations.json"
-    project_annotations_dir = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR)
-    os.makedirs(project_annotations_dir, exist_ok=True)
-    
+    row = list(data['manual_annotations'].keys())[0]
+    model_id = data['manual_annotations'][row]['model_id']
+    field_name = list(data['manual_annotations'][row].keys())[0]
+    annotation_data['manual_annotations'][model_id][row][field_name] = data['manual_annotations'][row][field_name]
+
     with open(os.path.join(project_annotations_dir, annotation_filename), 'w') as f:
-        json.dump(annotation_data, f, indent=2)
+            json.dump(annotation_data, f, indent=2)
     
     return jsonify({'message': 'Annotations saved successfully'})
 

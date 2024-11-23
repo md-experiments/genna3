@@ -4,7 +4,11 @@ gpt-4o-mini:
 haiku3:
   client: anthropic
   model_name: claude-3-haiku-20240307
-gwen05bn:
+gwen2.5-0.5bn:
   client: ollama
   model_name: qwen2.5:0.5b
+  url: localhost:11434
+llama3.2-0.5b:
+  client: ollama
+  model_name: llama3.2:1b
   url: localhost:11434
