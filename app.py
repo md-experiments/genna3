@@ -5,7 +5,7 @@ import os
 import yaml
 from collections import OrderedDict
 import time
-from src.utils import log_traceback
+from src.utils import log_traceback, update_nested_dict
 app = Flask(__name__)
 
 BASE_DIR = 'data'
@@ -216,10 +216,11 @@ def save_annotations(project):
             'version': '2.0'
         }
     }
-    row = list(data['manual_annotations'].keys())[0]
-    model_id = data['manual_annotations'][row]['model_id']
-    field_name = list(data['manual_annotations'][row].keys())[0]
-    annotation_data['manual_annotations'][model_id][row][field_name] = data['manual_annotations'][row][field_name]
+    model_id = list(data['manual_annotations'].keys())[0]
+    row = list(data['manual_annotations'][model_id].keys())[0]
+    field_name = list(data['manual_annotations'][model_id][row].keys())[0]
+    annotation_data = update_nested_dict(annotation_data, ['manual_annotations',model_id, row, field_name], data['manual_annotations'][model_id][row][field_name])
+    #annotation_data['manual_annotations'].get(model_id,{}).get(row,{}).get(field_name,{}) = data['manual_annotations'][model_id][row][field_name]
 
     with open(os.path.join(project_annotations_dir, annotation_filename), 'w') as f:
             json.dump(annotation_data, f, indent=2)

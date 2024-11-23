@@ -30,22 +30,30 @@
             </div>
         </div>
 
-        <div class="row mb-4">
-            <div class="col">
-                <div class="d-flex gap-2 align-items-center">
-                    <select class="form-select" id="fileSelect" style="width: auto;">
-                        <option value="">Select a file...</option>
-                    </select>
-                    <button class="btn btn-primary" onclick="document.getElementById('fileUpload').click()">
-                        <i class="bi bi-upload"></i> Upload CSV
-                    </button>
-                    <input type="file" id="fileUpload" accept=".csv" style="display: none;" onchange="uploadFile(this)">
-                    <button class="btn btn-danger" onclick="deleteFile()" id="deleteBtn" style="display: none;">
-                        <i class="bi bi-trash"></i> Delete File
-                    </button>
-                </div>
+<div class="row mb-4">
+    <div class="col">
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select" id="fileSelect" style="width: auto;">
+                <option value="">Select a file...</option>
+            </select>
+            <button class="btn btn-primary" onclick="document.getElementById('fileUpload').click()">
+                <i class="bi bi-upload"></i> Upload CSV
+            </button>
+            <input type="file" id="fileUpload" accept=".csv" style="display: none;" onchange="uploadFile(this)">
+            <button class="btn btn-danger" onclick="deleteFile()" id="deleteBtn" style="display: none;">
+                <i class="bi bi-trash"></i> Delete File
+            </button>
+            <div class="btn-group ms-2">
+                <button class="btn btn-outline-secondary" onclick="toggleAllAnnotations()">
+                    <i class="bi bi-chevron-expand"></i> Show/Hide All
+                </button>
+                <button class="btn btn-outline-secondary" onclick="toggleDisagreementsFilter()">
+                    <i class="bi bi-exclamation-triangle"></i> Show Disagreements
+                </button>
             </div>
         </div>
+    </div>
+</div>
 
 <div id="dataContainer" style="display: none;">
     <div class="table-responsive">
@@ -253,6 +261,25 @@ function renderTableData(data) {
                                         `).join('')}
                                     </tr>
                                 `).join('')}
+                                <tr class="summary-row" style="display: none;">
+                                    <td style="width: 40px;"></td>
+                                    <td style="width: 150px;">
+                                        <div class="summary-indicator">
+                                            <i class="bi bi-info-circle"></i>
+                                            <div class="summary-label">Summary</div>
+                                        </div>
+                                    </td>
+                                    ${data.columns.map(col => `
+                                        <td>
+                                            ${data.column_settings?.[col]?.label ? `
+                                                <div class="summary-cell" data-row-id="${rowId}" data-column="${col}">
+                                                    <span class="difference-count">0</span>
+                                                    <i class="bi bi-check-circle text-success"></i>
+                                                </div>
+                                            ` : ''}
+                                        </td>
+                                    `).join('')}
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -261,6 +288,148 @@ function renderTableData(data) {
         `;
     }).join('');
 }
+
+function toggleAnnotations(rowId) {
+    const button = document.querySelector(`tr[data-row-id="${rowId}"] .expand-row i`);
+    const annotationsRow = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"]`);
+    const summaryRow = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"] .summary-row`);
+    
+    if (annotationsRow.style.display === 'none') {
+        button.classList.remove('bi-chevron-right');
+        button.classList.add('bi-chevron-down');
+        annotationsRow.style.display = 'table-row';
+        if (summaryRow) {
+            summaryRow.style.display = 'table-row';
+            updateSummaryRow(rowId);
+        }
+    } else {
+        button.classList.remove('bi-chevron-down');
+        button.classList.add('bi-chevron-right');
+        annotationsRow.style.display = 'none';
+    }
+}
+
+function toggleAllAnnotations() {
+    const allRows = document.querySelectorAll('tr[data-row-id]');
+    const firstVisibleAnnotation = document.querySelector('.annotations-row[style="display: table-row;"]');
+    const shouldShow = !firstVisibleAnnotation;
+
+    allRows.forEach(row => {
+        if (row.classList.contains('annotations-row')) {
+            row.style.display = shouldShow ? 'table-row' : 'none';
+            
+            // Toggle chevron icon
+            const rowId = row.getAttribute('data-row-id');
+            const button = document.querySelector(`tr[data-row-id="${rowId}"] .expand-row i`);
+            if (button) {
+                button.classList.remove(shouldShow ? 'bi-chevron-right' : 'bi-chevron-down');
+                button.classList.add(shouldShow ? 'bi-chevron-down' : 'bi-chevron-right');
+            }
+
+            // Update summary row
+            if (shouldShow) {
+                updateSummaryRow(rowId);
+            }
+        }
+    });
+}
+
+function toggleDisagreementsFilter() {
+    const button = document.querySelector('button[onclick="toggleDisagreementsFilter()"]');
+    const isActive = button.classList.contains('active');
+    
+    if (!isActive) {
+        // Show only rows with disagreements
+        document.querySelectorAll('tr[data-row-id]').forEach(row => {
+            if (!row.classList.contains('annotations-row')) {
+                const rowId = row.getAttribute('data-row-id');
+                // Check if any summary cell has differences
+                const hasDifferences = Array.from(
+                    document.querySelectorAll(`tr.annotations-row[data-row-id="${rowId}"] .summary-cell`)
+                ).some(cell => parseInt(cell.getAttribute('data-differences') || '0') > 0);
+                
+                row.style.display = hasDifferences ? 'table-row' : 'none';
+                
+                // Show corresponding annotation row if it has differences
+                const annotationRow = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"]`);
+                if (annotationRow && hasDifferences) {
+                    annotationRow.style.display = 'table-row';
+                    const button = row.querySelector('.expand-row i');
+                    button.classList.remove('bi-chevron-right');
+                    button.classList.add('bi-chevron-down');
+                } else if (annotationRow) {
+                    annotationRow.style.display = 'none';
+                }
+            }
+        });
+        button.classList.add('active');
+    } else {
+        // Show all rows
+        document.querySelectorAll('tr[data-row-id]').forEach(row => {
+            if (!row.classList.contains('annotations-row')) {
+                row.style.display = 'table-row';
+            } else {
+                row.style.display = 'none';
+                const rowId = row.getAttribute('data-row-id');
+                const button = document.querySelector(`tr[data-row-id="${rowId}"] .expand-row i`);
+                button.classList.remove('bi-chevron-down');
+                button.classList.add('bi-chevron-right');
+            }
+        });
+        button.classList.remove('active');
+    }
+}
+
+
+function updateSummaryRow(rowId) {
+    const summaryRow = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"] .summary-row`);
+    if (!summaryRow) return;
+
+    summaryRow.style.display = 'table-row';
+    const modelRows = document.querySelectorAll(`tr.annotations-row[data-row-id="${rowId}"] .model-row`);
+    
+    document.querySelectorAll(`tr.annotations-row[data-row-id="${rowId}"] .summary-cell`).forEach(cell => {
+        const column = cell.dataset.column;
+        const aiValues = new Map(); // Map of model -> value
+        
+        modelRows.forEach(row => {
+            const modelId = row.getAttribute('data-model');
+            const annotationCell = row.querySelector(`[data-column="${column}"]`);
+            if (annotationCell) {
+                const valueSpan = annotationCell.querySelector('.annotation-value');
+                if (valueSpan && valueSpan.style.display !== 'none') {
+                    aiValues.set(modelId, valueSpan.textContent);
+                }
+            }
+        });
+
+        // Count unique values to determine if there are disagreements
+        const uniqueValues = new Set(aiValues.values());
+        const differenceCount = uniqueValues.size > 1 ? uniqueValues.size : 0;
+
+        // Update summary icon and text
+        const icon = cell.querySelector('i');
+        const countSpan = cell.querySelector('.difference-count');
+        if (differenceCount > 0) {
+            icon.className = 'bi bi-exclamation-triangle text-warning';
+            icon.title = `${differenceCount} different values found`;
+            cell.setAttribute('data-differences', differenceCount);
+            countSpan.textContent = differenceCount;
+            countSpan.style.display = 'inline';
+        } else if (aiValues.size > 0) {
+            icon.className = 'bi bi-check-circle text-success';
+            icon.title = 'All annotations agree';
+            cell.setAttribute('data-differences', '0');
+            countSpan.style.display = 'none';
+        } else {
+            icon.className = 'bi bi-dash-circle text-muted';
+            icon.title = 'No annotations';
+            cell.setAttribute('data-differences', '0');
+            countSpan.style.display = 'none';
+        }
+    });
+}
+
 function loadAnnotations(filename) {
     const project = document.body.getAttribute('data-project');
     fetch(`/load_annotations/${project}/${filename}`)
@@ -301,6 +470,9 @@ function loadAnnotations(filename) {
                                         }
                                     }
                                 });
+                                
+                                // Update summary row after loading AI annotations
+                                updateSummaryRow(rowId);
                             }
                         }
                     });
@@ -315,6 +487,8 @@ function loadAnnotations(filename) {
                             `tr.annotations-row[data-row-id="${rowId}"] .model-row[data-model="${modelId}"]`
                         );
                         if (modelRow) {
+                            modelRow.style.display = 'table-row';
+                            
                             Object.entries(fieldAnnotations).forEach(([column, isCorrect]) => {
                                 // Find the column index in the main table
                                 const mainHeaderCells = document.querySelector('#tableHeader tr:first-child').cells;
@@ -330,17 +504,25 @@ function loadAnnotations(filename) {
                                         if (thumbsUp && thumbsDown) {
                                             thumbsUp.classList.toggle('active', isCorrect === true);
                                             thumbsDown.classList.toggle('active', isCorrect === false);
+                                            
+                                            // Show the label actions since we have a manual annotation
+                                            const labelActions = targetCell.querySelector('.label-actions');
+                                            if (labelActions) {
+                                                labelActions.style.display = 'flex';
+                                            }
                                         }
                                     }
                                 }
                             });
+                            
+                            // Update summary row after loading manual annotations
+                            updateSummaryRow(rowId);
                         }
                     });
                 });
             }
         });
 }
-
 
 // Upload file
 function uploadFile(input) {
@@ -451,12 +633,16 @@ function setLabel(rowId, column, value, modelId) {
                 project: project,
                 csv_filename: filename,
                 manual_annotations: {
-                    [rowId]: {
-                        [column]: value,
-                        model_id: modelId
+                    [modelId]: {
+                        [rowId]: {
+                            [column]: value
+                        }
                     }
                 }
             })
+        }).then(() => {
+            // Update summary row after saving annotation
+            updateSummaryRow(rowId);
         });
     }
 }

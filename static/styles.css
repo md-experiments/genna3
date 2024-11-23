@@ -209,3 +209,41 @@ body.dark-mode {
     background-color: var(--bg-color);
     color: var(--text-color);
 }
+
+.summary-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.summary-indicator i {
+    font-size: 1.2em;
+}
+
+.summary-label {
+    font-weight: 500;
+    color: #6c757d;
+}
+
+.summary-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+}
+
+.summary-cell i {
+    font-size: 1.2em;
+}
+
+/* Dark mode styles */
+.dark-mode .summary-indicator {
+    background-color: #2d3238;
+}
+
+.dark-mode .summary-label {
+    color: #adb5bd;
+}

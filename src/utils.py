@@ -4,7 +4,37 @@ import os
 import tiktoken
 import traceback
 import json
+from typing import Dict, Any
+from copy import deepcopy
 
+def update_nested_dict(data: Dict[str, Any], keys: list, value: Any) -> Dict[str, Any]:
+    """
+    Safely updates a nested dictionary, creating intermediate dictionaries if they don't exist.
+    
+    Args:
+        data: The original dictionary to update
+        keys: List of keys representing the path to the value to update
+        value: The value to set at the specified path
+    
+    Returns:
+        Updated dictionary
+    """
+    # Create a deep copy to avoid modifying the original
+    result = deepcopy(data)
+    
+    # Start at the root
+    current = result
+    
+    # Navigate through all but the last key
+    for key in keys[:-1]:
+        if key not in current:
+            current[key] = {}
+        current = current[key]
+    
+    # Set the final value
+    current[keys[-1]] = value
+    
+    return result
 def log_traceback():
     return traceback.format_exc()
 
