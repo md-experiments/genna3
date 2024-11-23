@@ -1,4 +1,3 @@
-<!-- Previous code remains unchanged until renderTableData function -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -310,13 +309,13 @@ function loadAnnotations(filename) {
 
             // Handle manual annotations
             if (data.manual_annotations) {
-                Object.entries(data.manual_annotations).forEach(([rowId, annotations]) => {
-                    Object.entries(annotations).forEach(([column, value]) => {
-                        if (value.model_id) {
-                            const modelRow = document.querySelector(
-                                `tr.annotations-row[data-row-id="${rowId}"] .model-row[data-model="${value.model_id}"]`
-                            );
-                            if (modelRow) {
+                Object.entries(data.manual_annotations).forEach(([modelId, rowAnnotations]) => {
+                    Object.entries(rowAnnotations).forEach(([rowId, fieldAnnotations]) => {
+                        const modelRow = document.querySelector(
+                            `tr.annotations-row[data-row-id="${rowId}"] .model-row[data-model="${modelId}"]`
+                        );
+                        if (modelRow) {
+                            Object.entries(fieldAnnotations).forEach(([column, isCorrect]) => {
                                 // Find the column index in the main table
                                 const mainHeaderCells = document.querySelector('#tableHeader tr:first-child').cells;
                                 const columnIndex = Array.from(mainHeaderCells).findIndex(cell => cell.textContent.trim() === column);
@@ -326,11 +325,15 @@ function loadAnnotations(filename) {
                                     const targetCell = modelRow.cells[columnIndex];
                                     
                                     if (targetCell) {
-                                        const btn = targetCell.querySelector(value ? '.thumbs-up' : '.thumbs-down');
-                                        if (btn) btn.classList.add('active');
+                                        const thumbsUp = targetCell.querySelector('.thumbs-up');
+                                        const thumbsDown = targetCell.querySelector('.thumbs-down');
+                                        if (thumbsUp && thumbsDown) {
+                                            thumbsUp.classList.toggle('active', isCorrect === true);
+                                            thumbsDown.classList.toggle('active', isCorrect === false);
+                                        }
                                     }
                                 }
-                            }
+                            });
                         }
                     });
                 });
