@@ -3,53 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Genna - Generative AI Annotation Tool</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <title>Genna</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <style>
-        .ai-annotation {
-            background-color: var(--ai-annotation-bg);
-            border-radius: 4px;
-            padding: 8px;
-            margin-bottom: 8px;
-        }
-        .ai-annotation-header {
-            font-size: 0.9em;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .ai-annotation-content {
-            font-size: 0.95em;
-        }
-        .annotations-container {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .manual-annotation {
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 8px;
-            margin-bottom: 8px;
-        }
-    </style>
 </head>
-<body>
+<body data-project="{{ project }}">
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#">Genna - AI Annotation Tool</a>
+            <a class="navbar-brand" href="/">
+                <img src="{{ url_for('static', filename='logo.png') }}" width="40" height="40" class="d-inline-block align-top" alt="">
+                Genna
+              </a>
             <div class="d-flex">
-                <select id="projectSelect" class="form-select me-2">
-                    <option value="">Select Project</option>
-                </select>
-                <button id="newProjectBtn" class="btn btn-outline-secondary me-2">
-                    <i class="bi bi-plus"></i>
-                </button>
-                <input type="file" id="csvFile" accept=".csv" class="form-control me-2">
-                <button id="uploadBtn" class="btn btn-outline-secondary me-2">Upload</button>
+                <a href="/settings/{{ project }}" class="btn btn-outline-secondary me-2">Settings</a>
                 <div class="form-check form-switch ms-2">
                     <input class="form-check-input mode-switch" type="checkbox" id="modeSwitch">
                     <label class="form-check-label" for="modeSwitch">Dark</label>
@@ -58,39 +26,645 @@
         </div>
     </nav>
 
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
-                <div class="position-sticky pt-3">
-                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
-                        <span>Projects</span>
-                    </h6>
-                    <ul class="nav flex-column" id="projectList">
-                        <!-- Projects will be loaded here -->
-                    </ul>
-                </div>
+    <div class="container-fluid mt-4">
+        <div class="row mb-4">
+            <div class="col">
+                <h2>{{ project }}</h2>
+                <p class="text-muted">{{ objective }}</p>
             </div>
+        </div>
 
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="table-responsive">
-                    <div id="dataContainer"></div>
-                </div>
-            </main>
+<div class="row mb-4">
+    <div class="col">
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select" id="fileSelect" style="width: auto;">
+                <option value="">Select a file...</option>
+            </select>
+            <button class="btn btn-primary" onclick="document.getElementById('fileUpload').click()">
+                <i class="bi bi-upload"></i> Upload CSV
+            </button>
+            <input type="file" id="fileUpload" accept=".csv" style="display: none;" onchange="uploadFile(this)">
+            <button class="btn btn-danger" onclick="deleteFile()" id="deleteBtn" style="display: none;">
+                <i class="bi bi-trash"></i> Delete File
+            </button>
+            <div class="btn-group ms-2">
+                <button class="btn btn-outline-secondary" onclick="toggleAllAnnotations()">
+                    <i class="bi bi-chevron-expand"></i> Show/Hide All
+                </button>
+                <button class="btn btn-outline-secondary" onclick="toggleDisagreementsFilter()">
+                    <i class="bi bi-exclamation-triangle"></i> Show Disagreements
+                </button>
+            </div>
         </div>
     </div>
+</div>
 
-    <!-- Template for AI Annotation Column -->
-    <template id="aiAnnotationTemplate">
-        <div class="ai-annotation">
-            <div class="ai-annotation-header">
-                <span class="model-name"></span>
-                <small class="temperature"></small>
-            </div>
-            <div class="ai-annotation-content"></div>
-        </div>
-    </template>
+<div id="dataContainer" style="display: none;">
+    <div class="table-responsive">
+        <table class="table">
+            <thead id="tableHeader">
+                <tr>
+                    <th style="width: 40px;"></th>
+                    <!-- Column headers will be added here -->
+                </tr>
+                <tr class="filter-row">
+                    <th></th>
+                    <!-- Filter inputs will be added here -->
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <!-- Data rows will be added here -->
+            </tbody>
+        </table>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // File selection handler - defined before loadFiles
+    const fileSelect = document.getElementById('fileSelect');
+    fileSelect.addEventListener('change', function() {
+        const filename = this.value;
+        document.getElementById('deleteBtn').style.display = filename ? 'block' : 'none';
+        if (filename) {
+            document.getElementById('dataContainer').style.display = 'none'; // Hide current data
+            loadFileData(filename);
+        } else {
+            document.getElementById('dataContainer').style.display = 'none';
+        }
+    });
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    // Load file list
+    function loadFiles() {
+        const project = document.body.getAttribute('data-project');
+        fetch(`/get_project_files/${project}`)
+            .then(response => response.json())
+            .then(files => {
+                fileSelect.innerHTML = '<option value="">Select a file...</option>' +
+                    files.map(file => `<option value="${file}">${file}</option>`).join('');
+                
+                // Auto-load first file if available
+                if (files.length > 0) {
+                    fileSelect.value = files[0];
+                    document.getElementById('deleteBtn').style.display = 'block';
+                    loadFileData(files[0]);
+                }
+            });
+        }
+
+// Load file data
+function loadFileData(filename) {
+    const project = document.body.getAttribute('data-project');
+    fetch(`/load_csv/${project}/${filename}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+
+            // Create header and filter rows
+            const headerRow = document.createElement('tr');
+            const filterRow = document.createElement('tr');
+            filterRow.className = 'filter-row';
+            
+            headerRow.innerHTML = `
+                <th style="width: 40px;">Actions</th>
+                <th style="width: 150px;">Model</th>
+                ${data.columns.map(col => `<th>${col}</th>`).join('')}
+            `;
+            
+            filterRow.innerHTML = `
+                <th></th>
+                <th></th>
+                ${data.columns.map(col => `
+                    <th>
+                        <input type="text" class="form-control form-control-sm column-filter" 
+                               data-column="${col}" placeholder="Filter ${col}...">
+                    </th>
+                `).join('')}
+            `;
+
+            const thead = document.getElementById('tableHeader');
+            thead.innerHTML = '';
+            thead.appendChild(headerRow);
+            thead.appendChild(filterRow);
+
+            // Store the original data for filtering
+            window.originalData = data.data;
+            
+            // Create data rows
+            renderTableData(data);
+
+            document.getElementById('dataContainer').style.display = 'block';
+            loadAnnotations(filename);
+
+            // Add filter event listeners
+            document.querySelectorAll('.column-filter').forEach(input => {
+                input.addEventListener('input', filterData);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading file:', error);
+            alert('Error loading file. Please try again.');
+        });
+}
+
+function filterData() {
+    const filters = {};
+    document.querySelectorAll('.column-filter').forEach(input => {
+        const value = input.value.trim().toLowerCase();
+        if (value) {
+            filters[input.dataset.column] = value;
+        }
+    });
+
+    const filteredData = window.originalData.map((row, index) => ({
+        ...row,
+        original_index: index // Preserve original index
+    })).filter(row => {
+        return Object.entries(filters).every(([column, filterValue]) => {
+            const cellValue = String(row[column] || '').toLowerCase();
+            return cellValue.includes(filterValue);
+        });
+    });
+
+    renderTableData({ 
+        data: filteredData, 
+        columns: window.originalData.length > 0 ? Object.keys(window.originalData[0]) : [],
+        column_settings: window.lastColumnSettings,
+        ai_annotators: window.lastAnnotators
+    });
+
+    // Reload annotations for filtered data
+    const filename = document.getElementById('fileSelect').value;
+    if (filename) {
+        loadAnnotations(filename);
+    }
+}
+
+function renderTableData(data) {
+    // Store settings for reuse
+    window.lastColumnSettings = data.column_settings;
+    window.lastAnnotators = data.ai_annotators;
+
+    const tableBody = document.getElementById('tableBody');
+    tableBody.innerHTML = data.data.map((row, index) => {
+        // Use original index from data if available, otherwise use current index
+        const rowId = row.original_index !== undefined ? row.original_index : index;
+        return `
+            <tr data-row-id="${rowId}">
+                <td style="width: 40px;">
+                    <button class="expand-row" onclick="toggleAnnotations('${rowId}')">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </td>
+                <td style="width: 150px;"></td>
+                ${data.columns.map(col => `
+                    <td>
+                        ${row[col] || ''}
+                    </td>
+                `).join('')}
+            </tr>
+            <tr class="annotations-row" style="display: none;" data-row-id="${rowId}">
+                <td colspan="${data.columns.length + 2}">
+                    <div class="row-annotations">
+                        <table class="table" style="table-layout: fixed;">
+                            <colgroup>
+                                <col style="width: 40px;">
+                                <col style="width: 150px;">
+                                ${data.columns.map(() => `<col>`).join('')}
+                            </colgroup>
+                            <tbody>
+                                ${data.ai_annotators.map(model => `
+                                    <tr class="model-row" data-model="${model.annotator_id}" style="display: none;">
+                                        <td style="width: 40px;"></td>
+                                        <td style="width: 150px;">
+                                            <div class="model-indicator" title="${model.name}">
+                                                <i class="bi bi-robot"></i>
+                                                <div class="model-name">${model.name}</div>
+                                            </div>
+                                        </td>
+                                        ${data.columns.map(col => `
+                                            <td>
+                                                ${data.column_settings?.[col]?.label ? `
+                                                    <div class="annotation-cell">
+                                                        <span class="annotation-value" data-model="${model.annotator_id}" data-column="${col}">
+                                                            Not annotated
+                                                        </span>
+                                                        <div class="label-actions" style="display: none;">
+                                                            <button class="label-btn thumbs-up" onclick="setLabel('${rowId}', '${col}', true, '${model.annotator_id}')" title="Correct">
+                                                                <i class="bi bi-hand-thumbs-up"></i>
+                                                            </button>
+                                                            <button class="label-btn thumbs-down" onclick="setLabel('${rowId}', '${col}', false, '${model.annotator_id}')" title="Incorrect">
+                                                                <i class="bi bi-hand-thumbs-down"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ` : ''}
+                                            </td>
+                                        `).join('')}
+                                    </tr>
+                                `).join('')}
+                                <tr class="summary-row" style="display: none;">
+                                    <td style="width: 40px;"></td>
+                                    <td style="width: 150px;">
+                                        <div class="summary-indicator">
+                                            <i class="bi bi-info-circle"></i>
+                                            <div class="summary-label">Summary</div>
+                                        </div>
+                                    </td>
+                                    ${data.columns.map(col => `
+                                        <td>
+                                            ${data.column_settings?.[col]?.label ? `
+                                                <div class="summary-cell" data-row-id="${rowId}" data-column="${col}">
+                                                    <span class="difference-count">0</span>
+                                                    <i class="bi bi-check-circle text-success"></i>
+                                                </div>
+                                            ` : ''}
+                                        </td>
+                                    `).join('')}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function toggleAnnotations(rowId) {
+    const button = document.querySelector(`tr[data-row-id="${rowId}"] .expand-row i`);
+    const annotationsRow = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"]`);
+    const summaryRow = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"] .summary-row`);
+    
+    if (annotationsRow.style.display === 'none') {
+        button.classList.remove('bi-chevron-right');
+        button.classList.add('bi-chevron-down');
+        annotationsRow.style.display = 'table-row';
+        if (summaryRow) {
+            summaryRow.style.display = 'table-row';
+            updateSummaryRow(rowId);
+        }
+    } else {
+        button.classList.remove('bi-chevron-down');
+        button.classList.add('bi-chevron-right');
+        annotationsRow.style.display = 'none';
+    }
+}
+
+function toggleAllAnnotations() {
+    const allRows = document.querySelectorAll('tr[data-row-id]');
+    const firstVisibleAnnotation = document.querySelector('.annotations-row[style="display: table-row;"]');
+    const shouldShow = !firstVisibleAnnotation;
+
+    allRows.forEach(row => {
+        if (row.classList.contains('annotations-row')) {
+            row.style.display = shouldShow ? 'table-row' : 'none';
+            
+            // Toggle chevron icon
+            const rowId = row.getAttribute('data-row-id');
+            const button = document.querySelector(`tr[data-row-id="${rowId}"] .expand-row i`);
+            if (button) {
+                button.classList.remove(shouldShow ? 'bi-chevron-right' : 'bi-chevron-down');
+                button.classList.add(shouldShow ? 'bi-chevron-down' : 'bi-chevron-right');
+            }
+
+            // Update summary row
+            if (shouldShow) {
+                updateSummaryRow(rowId);
+            }
+        }
+    });
+}
+
+function toggleDisagreementsFilter() {
+    const button = document.querySelector('button[onclick="toggleDisagreementsFilter()"]');
+    const isActive = button.classList.contains('active');
+    
+    if (!isActive) {
+        // Show only rows with disagreements
+        document.querySelectorAll('tr[data-row-id]').forEach(row => {
+            if (!row.classList.contains('annotations-row')) {
+                const rowId = row.getAttribute('data-row-id');
+                // Check if any summary cell has differences
+                const hasDifferences = Array.from(
+                    document.querySelectorAll(`tr.annotations-row[data-row-id="${rowId}"] .summary-cell`)
+                ).some(cell => parseInt(cell.getAttribute('data-differences') || '0') > 0);
+                
+                row.style.display = hasDifferences ? 'table-row' : 'none';
+                
+                // Show corresponding annotation row if it has differences
+                const annotationRow = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"]`);
+                if (annotationRow && hasDifferences) {
+                    annotationRow.style.display = 'table-row';
+                    const button = row.querySelector('.expand-row i');
+                    button.classList.remove('bi-chevron-right');
+                    button.classList.add('bi-chevron-down');
+                } else if (annotationRow) {
+                    annotationRow.style.display = 'none';
+                }
+            }
+        });
+        button.classList.add('active');
+    } else {
+        // Show all rows
+        document.querySelectorAll('tr[data-row-id]').forEach(row => {
+            if (!row.classList.contains('annotations-row')) {
+                row.style.display = 'table-row';
+            } else {
+                row.style.display = 'none';
+                const rowId = row.getAttribute('data-row-id');
+                const button = document.querySelector(`tr[data-row-id="${rowId}"] .expand-row i`);
+                button.classList.remove('bi-chevron-down');
+                button.classList.add('bi-chevron-right');
+            }
+        });
+        button.classList.remove('active');
+    }
+}
+
+
+function updateSummaryRow(rowId) {
+    const summaryRow = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"] .summary-row`);
+    if (!summaryRow) return;
+
+    summaryRow.style.display = 'table-row';
+    const modelRows = document.querySelectorAll(`tr.annotations-row[data-row-id="${rowId}"] .model-row`);
+    
+    document.querySelectorAll(`tr.annotations-row[data-row-id="${rowId}"] .summary-cell`).forEach(cell => {
+        const column = cell.dataset.column;
+        const aiValues = new Map(); // Map of model -> value
+        
+        modelRows.forEach(row => {
+            const modelId = row.getAttribute('data-model');
+            const annotationCell = row.querySelector(`[data-column="${column}"]`);
+            if (annotationCell) {
+                const valueSpan = annotationCell.querySelector('.annotation-value');
+                if (valueSpan && valueSpan.style.display !== 'none') {
+                    aiValues.set(modelId, valueSpan.textContent);
+                }
+            }
+        });
+
+        // Count unique values to determine if there are disagreements
+        const uniqueValues = new Set(aiValues.values());
+        const differenceCount = uniqueValues.size > 1 ? uniqueValues.size : 0;
+
+        // Update summary icon and text
+        const icon = cell.querySelector('i');
+        const countSpan = cell.querySelector('.difference-count');
+        if (differenceCount > 0) {
+            icon.className = 'bi bi-exclamation-triangle text-warning';
+            icon.title = `${differenceCount} different values found`;
+            cell.setAttribute('data-differences', differenceCount);
+            countSpan.textContent = differenceCount;
+            countSpan.style.display = 'inline';
+        } else if (aiValues.size > 0) {
+            icon.className = 'bi bi-check-circle text-success';
+            icon.title = 'All annotations agree';
+            cell.setAttribute('data-differences', '0');
+            countSpan.style.display = 'none';
+        } else {
+            icon.className = 'bi bi-dash-circle text-muted';
+            icon.title = 'No annotations';
+            cell.setAttribute('data-differences', '0');
+            countSpan.style.display = 'none';
+        }
+    });
+}
+
+function loadAnnotations(filename) {
+    const project = document.body.getAttribute('data-project');
+    fetch(`/load_annotations/${project}/${filename}`)
+        .then(response => response.json())
+        .then(data => {
+            // Handle AI annotations first
+            if (data.ai_annotations) {
+                Object.entries(data.ai_annotations).forEach(([modelId, modelAnnotations]) => {
+                    Object.entries(modelAnnotations).forEach(([rowId, rowAnnotations]) => {
+                        // Only show model row if it has annotations for this row
+                        if (Object.keys(rowAnnotations).length > 0) {
+                            const modelRow = document.querySelector(
+                                `tr.annotations-row[data-row-id="${rowId}"] .model-row[data-model="${modelId}"]`
+                            );
+                            if (modelRow) {
+                                modelRow.style.display = 'table-row';
+                                
+                                Object.entries(rowAnnotations).forEach(([column, value]) => {
+                                    // Find the column index in the main table
+                                    const mainHeaderCells = document.querySelector('#tableHeader tr:first-child').cells;
+                                    const columnIndex = Array.from(mainHeaderCells).findIndex(cell => cell.textContent.trim() === column);
+                                    
+                                    if (columnIndex !== -1) {
+                                        // Map main table index to nested table index
+                                        const targetCell = modelRow.cells[columnIndex];
+                                        
+                                        if (targetCell) {
+                                            const valueSpan = targetCell.querySelector('.annotation-value');
+                                            const labelActions = targetCell.querySelector('.label-actions');
+                                            if (valueSpan) {
+                                                valueSpan.textContent = value;
+                                                valueSpan.style.display = 'inline-block';
+                                                // Only show thumbs up/down if there's an annotation
+                                                if (labelActions) {
+                                                    labelActions.style.display = 'flex';
+                                                }
+                                            }
+                                        }
+                                    }
+                                });
+                                
+                                // Update summary row after loading AI annotations
+                                updateSummaryRow(rowId);
+                            }
+                        }
+                    });
+                });
+            }
+
+            // Handle manual annotations
+            if (data.manual_annotations) {
+                Object.entries(data.manual_annotations).forEach(([modelId, rowAnnotations]) => {
+                    Object.entries(rowAnnotations).forEach(([rowId, fieldAnnotations]) => {
+                        const modelRow = document.querySelector(
+                            `tr.annotations-row[data-row-id="${rowId}"] .model-row[data-model="${modelId}"]`
+                        );
+                        if (modelRow) {
+                            modelRow.style.display = 'table-row';
+                            
+                            Object.entries(fieldAnnotations).forEach(([column, isCorrect]) => {
+                                // Find the column index in the main table
+                                const mainHeaderCells = document.querySelector('#tableHeader tr:first-child').cells;
+                                const columnIndex = Array.from(mainHeaderCells).findIndex(cell => cell.textContent.trim() === column);
+                                
+                                if (columnIndex !== -1) {
+                                    // Map main table index to nested table index
+                                    const targetCell = modelRow.cells[columnIndex];
+                                    
+                                    if (targetCell) {
+                                        const thumbsUp = targetCell.querySelector('.thumbs-up');
+                                        const thumbsDown = targetCell.querySelector('.thumbs-down');
+                                        if (thumbsUp && thumbsDown) {
+                                            thumbsUp.classList.toggle('active', isCorrect === true);
+                                            thumbsDown.classList.toggle('active', isCorrect === false);
+                                            
+                                            // Show the label actions since we have a manual annotation
+                                            const labelActions = targetCell.querySelector('.label-actions');
+                                            if (labelActions) {
+                                                labelActions.style.display = 'flex';
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                            
+                            // Update summary row after loading manual annotations
+                            updateSummaryRow(rowId);
+                        }
+                    });
+                });
+            }
+        });
+}
+
+// Upload file
+function uploadFile(input) {
+            if (!input.files.length) return;
+
+            const file = input.files[0];
+            if (!file.name.endsWith('.csv')) {
+                alert('Please select a CSV file');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('project', document.body.getAttribute('data-project'));
+
+            fetch('/upload_csv', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    loadFiles();
+                    input.value = '';
+                }
+            });
+        }
+
+        // Delete file
+        function deleteFile() {
+            const filename = document.getElementById('fileSelect').value;
+            if (!filename) return;
+
+            if (!confirm(`Are you sure you want to delete ${filename}?`)) return;
+
+            fetch('/delete_file', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    project: document.body.getAttribute('data-project'),
+                    filename: filename
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('fileSelect').value = '';
+                    document.getElementById('deleteBtn').style.display = 'none';
+                    document.getElementById('dataContainer').style.display = 'none';
+                    loadFiles();
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+        // Toggle annotations
+        function toggleAnnotations(rowId) {
+            const button = document.querySelector(`tr[data-row-id="${rowId}"] .expand-row i`);
+            const annotationsRow = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"]`);
+            
+            if (annotationsRow.style.display === 'none') {
+                button.classList.remove('bi-chevron-right');
+                button.classList.add('bi-chevron-down');
+                annotationsRow.style.display = 'table-row';
+            } else {
+                button.classList.remove('bi-chevron-down');
+                button.classList.add('bi-chevron-right');
+                annotationsRow.style.display = 'none';
+            }
+        }
+        
+// Set label
+function setLabel(rowId, column, value, modelId) {
+    const project = document.body.getAttribute('data-project');
+    const filename = document.getElementById('fileSelect').value;
+    if (!filename) return;
+
+    const row = document.querySelector(`tr.annotations-row[data-row-id="${rowId}"] .model-row[data-model="${modelId}"]`);
+    if (!row) return;
+
+    // Find the column index in the main table
+    const headerCells = document.querySelector('#tableHeader tr:first-child').cells;
+    const columnIndex = Array.from(headerCells).findIndex(cell => cell.textContent.trim() === column);
+    if (columnIndex === -1) return;
+
+    // Map main table index to nested table index
+    const cell = row.cells[columnIndex];
+    if (!cell) return;
+
+    const thumbsUp = cell.querySelector('.thumbs-up');
+    const thumbsDown = cell.querySelector('.thumbs-down');
+    
+    if (thumbsUp && thumbsDown) {
+        thumbsUp.classList.toggle('active', value);
+        thumbsDown.classList.toggle('active', !value);
+
+        fetch(`/save_annotations/${project}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                project: project,
+                csv_filename: filename,
+                manual_annotations: {
+                    [modelId]: {
+                        [rowId]: {
+                            [column]: value
+                        }
+                    }
+                }
+            })
+        }).then(() => {
+            // Update summary row after saving annotation
+            updateSummaryRow(rowId);
+        });
+    }
+}
+
+// Initialize dark mode
+const modeSwitch = document.getElementById('modeSwitch');
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+            modeSwitch.checked = true;
+        }
+
+        modeSwitch.addEventListener('change', () => {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', modeSwitch.checked);
+        });
+
+        // Initial load
+        loadFiles();
+    </script>
 </body>
 </html>

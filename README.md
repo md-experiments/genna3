@@ -1,10 +1,24 @@
-# Genna - Text Annotation System
+<h1><img alt='Genna logo' src='static/logo.png' width='40' align='left' style="padding:1px 5px 1px 1px;"/>Genna - Generative Annotation System </h1>
+  
 
-Genna is a Flask-based text annotation system that allows you to:
-1. Upload and manage CSV files for annotation
-2. Configure AI models as annotators and judges
-3. Manage annotations across multiple projects
-4. Compare and evaluate annotations through a judging system
+Genna (GENerative ANNotation) is a LLM-centric text annotation system designed for efficient text annotation and comparison of AI model outputs.
+
+## Key Features at a Glance
+- 📊 **CSV File Management**: Upload, manage, and annotate CSV files
+- 🤖 **AI Model Integration**: Configure multiple AI models as annotators
+- 📋 **Annotation Interface**: 
+  - Interactive annotation with thumbs up/down feedback
+  - Real-time disagreement detection between AI models
+  - Expandable annotation view for each row
+  - Dark mode support for comfortable viewing
+- 🔍 **Smart Filtering**:
+  - Filter by content across any column
+  - Show only rows with AI model disagreements
+  - Category-based multi-filtering
+- 📈 **Annotation Analysis**:
+  - Visual indicators for model agreements/disagreements
+  - Summary view showing differences between model outputs
+  - Quick toggle to show/hide all annotations
 
 ## Features
 
@@ -27,8 +41,17 @@ Genna is a Flask-based text annotation system that allows you to:
    - Each annotator has a unique name and configuration
    - Can handle multiple label types per annotation
    - Annotations are stored separately from source data
+   - Real-time visual feedback for model agreements/disagreements
+   - Interactive thumbs up/down interface for manual annotation
 
-2. **Judges**
+2. **Annotation Interface**
+   - Expandable rows showing all model annotations
+   - Summary row indicating differences between model outputs
+   - Dark mode support for reduced eye strain
+   - Quick filters to show only rows with disagreements
+   - Bulk show/hide annotations across all rows
+
+3. **Judges**
    - Special AI models that evaluate annotations
    - Compare annotations from two different annotators
    - Selected dynamically at annotation time
@@ -38,6 +61,7 @@ Genna is a Flask-based text annotation system that allows you to:
 - Filter data using category columns
 - Multi-select filtering capabilities
 - Organize and manage annotations by categories
+- Quick text search within any column
 
 ## Usage
 
@@ -60,6 +84,18 @@ Genna is a Flask-based text annotation system that allows you to:
    - Write base prompt
    - Configure label prompts
 4. Save the annotator
+
+### Using the Annotation Interface
+1. Select a file to annotate
+2. Use the expand/collapse buttons to view annotations
+3. Review AI model outputs
+4. Provide feedback using thumbs up/down
+5. Use filters to focus on specific content:
+   - Text search in any column
+   - Show only rows with model disagreements
+   - Category-based filtering
+6. Toggle dark mode for comfortable viewing
+7. Use bulk actions to show/hide all annotations
 
 ### Using Judges
 1. Create a judge model similar to annotators
@@ -124,12 +160,14 @@ Judges compare annotations by:
    - Clear, specific prompts
    - Appropriate temperature settings
 
-3. **Judging**
-   - Regular evaluation of annotations
-   - Compare different annotator combinations
-   - Monitor scores for quality control
+3. **Annotation Review**
+   - Use the disagreement filter to focus on problematic cases
+   - Review all model outputs before providing feedback
+   - Pay attention to the summary indicators
+   - Regular evaluation using judges
 
 4. **Data Management**
    - Regular backups
    - Clear category organization
    - Periodic cleanup of unused files
+   - Use filters effectively to manage large datasets
