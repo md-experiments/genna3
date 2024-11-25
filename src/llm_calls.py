@@ -55,6 +55,20 @@ custom_functions:
         - future_past
 """
 
+def llm_orchestrate(model_settings, data_record, content_columns, llm_client, array_format=False):
+    user_message = create_user_message(data_record, content_columns)
+    model_name, temperature, custom_functions = create_function_call(model_settings, array_format)
+    if llm_client == 'ollama':
+        return call_ollama(model_name, user_message, custom_functions, temperature)
+    elif llm_client == 'openai':
+        return call_openai(model_name, user_message, custom_functions, temperature)
+    elif llm_client == 'dummy':
+        return call_dummy(model_name, user_message, custom_functions, temperature)
+    
+def create_user_message(data_record, content_columns: list):
+    user_message = ' '.join([f"{col}: {data_record[col]}" for col in content_columns])
+    return user_message
+
 def create_function_call(model_settings, array_format=False):
     model_name = model_settings['model_name']
     function_name = model_settings['name']
@@ -128,6 +142,18 @@ def create_function_call(model_settings, array_format=False):
         }
         }]"""
     return model_name, temperature, custom_functions
+
+def call_dummy(model_name, user_message, custom_functions, temperature, max_tokens=1024):
+    response_msg = {
+        key_name: 'dummy_value'
+        for key_name in custom_functions[0]['parameters']['properties']
+    }
+    nr_tokens = {
+        'completion_tokens': 0,
+        'total_tokens': 0,
+        'prompt_tokens': 0
+    }
+    return response_msg, None, nr_tokens
 
 def call_openai(model_name, user_message, custom_functions, temperature, max_tokens=1024):
     from openai import OpenAI

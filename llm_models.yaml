@@ -12,3 +12,6 @@ llama3.2-0.5b:
   client: ollama
   model_name: llama3.2:1b
   url: localhost:11434
+dummy:
+  client: dummy
+  model_name: dummy
