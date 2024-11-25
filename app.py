@@ -4,8 +4,11 @@ import json
 import os
 import yaml
 from collections import OrderedDict
+from src.logger import logger
 import time
 from src.utils import log_traceback, update_nested_dict
+from src.llm_calls import create_function_call, llm_orchestrate
+
 app = Flask(__name__)
 
 BASE_DIR = 'data'
@@ -15,7 +18,7 @@ def load_llm_models():
     """Load available LLM models from yaml file."""
     with open('llm_models.yaml', 'r') as f:
         models = yaml.safe_load(f)
-    return list(models.keys())
+    return models
 
 def get_project_settings(project_name):
     settings_file = os.path.join(BASE_DIR, project_name, 'project_settings.json')
@@ -94,7 +97,7 @@ def project_settings(project):
 def get_settings(project):
     settings = get_project_settings(project)
     columns = get_project_columns(project)
-    models = load_llm_models()
+    models = list(load_llm_models().keys())
     
     # Initialize column settings if they don't exist
     if 'columns' not in settings:
@@ -193,16 +196,7 @@ def load_csv(project, filename):
         })
     return jsonify({'error': 'File not found'})
 
-@app.route('/save_annotations/<project>', methods=['POST'])
-def save_annotations(project):
-    data = request.json
-    #project = data['project']
-    print(data)
-    csv_filename = data['csv_filename']
-    annotations = data['manual_annotations']
-        
-    annotation_filename = f"{os.path.splitext(csv_filename)[0]}_annotations.json"
-    project_annotations_dir = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR)
+def get_annotations(project_annotations_dir, annotation_filename):
     os.makedirs(project_annotations_dir, exist_ok=True)
     if os.path.exists(os.path.join(project_annotations_dir, annotation_filename)):
         with open(os.path.join(project_annotations_dir, annotation_filename), 'r') as f:
@@ -216,12 +210,24 @@ def save_annotations(project):
             'version': '2.0'
         }
     }
+    return annotation_data
+
+@app.route('/save_annotations/<project>', methods=['POST'])
+def save_annotations(project):
+    data = request.json
+    #project = data['project']
+    print(data)
+    csv_filename = data['csv_filename']
+    annotations = data['manual_annotations']
+        
+    annotation_filename = f"{os.path.splitext(csv_filename)[0]}_annotations.json"
+    project_annotations_dir = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR)
+    annotation_data = get_annotations(project_annotations_dir, annotation_filename)
     model_id = list(data['manual_annotations'].keys())[0]
     row = list(data['manual_annotations'][model_id].keys())[0]
     field_name = list(data['manual_annotations'][model_id][row].keys())[0]
     annotation_data = update_nested_dict(annotation_data, ['manual_annotations',model_id, row, field_name], data['manual_annotations'][model_id][row][field_name])
-    #annotation_data['manual_annotations'].get(model_id,{}).get(row,{}).get(field_name,{}) = data['manual_annotations'][model_id][row][field_name]
-
+    
     with open(os.path.join(project_annotations_dir, annotation_filename), 'w') as f:
             json.dump(annotation_data, f, indent=2)
     
@@ -230,31 +236,15 @@ def save_annotations(project):
 @app.route('/load_annotations/<project>/<csv_filename>')
 def load_annotations(project, csv_filename):
     annotation_filename = f"{os.path.splitext(csv_filename)[0]}_annotations.json"
-    file_path = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, annotation_filename)
-    
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as f:
-            annotation_data = json.load(f)
-            
-        if isinstance(annotation_data, list):  # Old format
-            return jsonify({
-                'manual_annotations': annotation_data,
-                'ai_annotations': {},
-                'metadata': {
-                    'last_updated': pd.Timestamp.now().isoformat(),
-                    'version': '2.0'
-                }
-            })
-        return jsonify(annotation_data)
-    
-    return jsonify({
-        'manual_annotations': [],
-        'ai_annotations': {},
-        'metadata': {
-            'last_updated': pd.Timestamp.now().isoformat(),
-            'version': '2.0'
-        }
-    })
+    project_annotations_dir = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR)
+    annotation_data = get_annotations(project_annotations_dir, annotation_filename)
+    return jsonify(annotation_data)
+
+@app.route('/dummy_request', methods=['POST'])
+def dummy_request():
+    data = request.json
+    time.sleep(1)
+    return jsonify({'message': data['text'][:10]})
 
 @app.route('/annotate/<project>', methods=['POST'])
 def annotate_model(project):
@@ -273,18 +263,79 @@ def annotate_model(project):
             status = status_update
         with open(annotation_status_file, 'w') as f:
             json.dump(status, f, indent=2)
-    annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{data['annotator_id']}_annotation_status.json")
+    model_id = data['annotator_id']
+    annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{model_id}_annotation_status.json")
     status_update = {'message': f'Starting...', 'status': 'ongoing'}
+
     if os.path.exists(annotation_status_file):
         with open(annotation_status_file, 'r') as f:
             status = json.load(f)
     else:
         status = {'judges': {model0:{model1: status_update}}} if 'selected_annotators' in data else status_update
+    
     update_status(status, status_update, annotation_status_file)
-    for i in range(10):
+    project_dir = os.path.join(BASE_DIR, project)
+    settings = get_project_settings(project)
+    llm_models = load_llm_models()
+    model_name, temperature, custom_function = None, None, None
+    for model_settings in settings.get('ai_annotators', []):
+        if data['annotator_id'] == model_settings['annotator_id']:
+            model_name, temperature, custom_function = create_function_call(model_settings, array_format=False)
+            break
+    if not model_name:
+        return jsonify({'error': 'Model not found'})
+    
+    def create_text_from_record(record, columns):
+        txt = ''
+        read_columns = [col for col in columns if columns[col].get('content', False)]
+        missing_columns = set(read_columns).difference(set(record.keys()))
+        if missing_columns:
+            logger.error(f"Record is missing the following columns: {missing_columns}")
+            return None
+        for col in columns:
+            if col in record:
+                if columns[col].get('label', False):
+                    txt += f"{col}: {record[col]}\n"
+        return txt
+    
+    all_records = []
+    if os.path.exists(project_dir):
+        for file in os.listdir(project_dir):
+            if file.endswith('.csv'):
+                file_path = os.path.join(project_dir, file)
+                df = pd.read_csv(file_path).fillna('')
+                recs = df.to_dict(orient='records')
+
+                for rec_id, rec in enumerate(recs):
+                    txt = create_text_from_record(rec, settings['columns'])
+                    if not txt:
+                        continue
+                    all_records.append({
+                        'txt': txt,
+                        'file': file.replace('.csv', ''),
+                        'id': rec_id
+                    })
+    annotation_results = {}
+    for i, record in enumerate(all_records):
+        current_file = record['file']
+
         status_update = {'message': f'{int(100*i/10)}% complete', 'status': 'ongoing'}
         update_status(status, status_update, annotation_status_file)
-        time.sleep(0.25)
+        txt = record['txt']
+        llm_client = llm_models[model_name]['client']
+        response_msg, response, nr_tokens = llm_orchestrate(model_name, txt, custom_function, temperature, llm_client)
+        annotation_results[str(record['id'])] = response_msg
+        if i < len(all_records)-1:
+            active_file = all_records[i+1]['file']
+        else:
+            active_file = ''
+        if active_file != current_file:
+            annotation_data = get_annotations(project_annotations_dir, f"{current_file}_annotations.json")
+            annotation_data = update_nested_dict(annotation_data, ['ai_annotations', model_id], annotation_results)
+            with open(os.path.join(project_annotations_dir, f"{current_file}_annotations.json"), 'w') as f:
+                json.dump(annotation_data, f, indent=2)
+            annotation_results = {}
+        #time.sleep(0.25)
     status_update = {'message': f'Completed', 'status': 'completed'}
     update_status(status, status_update, annotation_status_file)
     return jsonify({'status': 'completed'})

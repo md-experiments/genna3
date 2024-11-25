@@ -55,15 +55,15 @@ custom_functions:
         - future_past
 """
 
-def llm_orchestrate(model_settings, data_record, content_columns, llm_client, array_format=False):
-    user_message = create_user_message(data_record, content_columns)
-    model_name, temperature, custom_functions = create_function_call(model_settings, array_format)
+def llm_orchestrate(model_name, user_message, custom_functions, temperature, llm_client):
     if llm_client == 'ollama':
         return call_ollama(model_name, user_message, custom_functions, temperature)
     elif llm_client == 'openai':
         return call_openai(model_name, user_message, custom_functions, temperature)
     elif llm_client == 'dummy':
         return call_dummy(model_name, user_message, custom_functions, temperature)
+    else:
+        raise ValueError(f"Unknown LLM client {llm_client}")
     
 def create_user_message(data_record, content_columns: list):
     user_message = ' '.join([f"{col}: {data_record[col]}" for col in content_columns])
@@ -145,7 +145,7 @@ def create_function_call(model_settings, array_format=False):
 
 def call_dummy(model_name, user_message, custom_functions, temperature, max_tokens=1024):
     response_msg = {
-        key_name: 'dummy_value'
+        key_name: user_message
         for key_name in custom_functions[0]['parameters']['properties']
     }
     nr_tokens = {
