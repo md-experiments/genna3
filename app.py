@@ -8,6 +8,8 @@ from src.logger import logger
 import time
 from src.utils import log_traceback, update_nested_dict
 from src.llm_calls import create_function_call, llm_orchestrate
+from src.llm_annotation_utils import create_annotation_records
+from src.utils_async import ProgressManager, AsyncFunction
 
 app = Flask(__name__)
 
@@ -216,7 +218,7 @@ def get_annotations(project_annotations_dir, annotation_filename):
 def save_annotations(project):
     data = request.json
     #project = data['project']
-    print(data)
+    #print(data)
     csv_filename = data['csv_filename']
     annotations = data['manual_annotations']
         
@@ -246,85 +248,54 @@ def dummy_request():
     time.sleep(1)
     return jsonify({'message': data['text'][:10]})
 
+# Initialize spell checker with your function
+def async_orchestrate(record):
+    txt = record['txt']
+    llm_client = record['llm_client']
+    model_proper_name = record['model_proper_name']
+    temperature = record['temperature']
+    custom_function = record['custom_function']
+    status, response_msg, _, _ = llm_orchestrate(model_proper_name, txt, custom_function, temperature, llm_client)
+    return {
+        'status': status,
+        'response': response_msg,
+        'id': record['id'],
+        'file': record['file']
+    }
+
+async_analyze = AsyncFunction(max_workers=4)
+
 @app.route('/annotate/<project>', methods=['POST'])
-def annotate_model(project):
+def annotate_model_async(project):
     data = request.json
-    print(data)
+    #print(data)
+    project_dir = os.path.join(BASE_DIR, project)
     project_annotations_dir = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR)
     os.makedirs(project_annotations_dir, exist_ok=True)
     #print(data)
+    model_id = data['annotator_id']
+    task_id = data['annotator_id']
     if 'selected_annotators' in data:
         model0 = data['selected_annotators']['first']['id']
         model1 = data['selected_annotators']['second']['id']
-    def update_status(status, status_update, annotation_status_file):
-        if 'selected_annotators' in data:
-            status['judges'].get(model0, {model1: {}})[model1] = status_update
-        else:
-            status = status_update
-        with open(annotation_status_file, 'w') as f:
-            json.dump(status, f, indent=2)
-    model_id = data['annotator_id']
-    annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{model_id}_annotation_status.json")
-    status_update = {'message': f'Starting...', 'status': 'ongoing'}
-
-    if os.path.exists(annotation_status_file):
-        with open(annotation_status_file, 'r') as f:
-            status = json.load(f)
-    else:
-        status = {'judges': {model0:{model1: status_update}}} if 'selected_annotators' in data else status_update
-    
-    update_status(status, status_update, annotation_status_file)
-    project_dir = os.path.join(BASE_DIR, project)
+        task_id = f"{model_id}_M0:{model0}_M1:{model1}"
+        return jsonify({'message': "Judges model vs model not implemented yet",'status': 'error'})
     settings = get_project_settings(project)
+
     llm_models = load_llm_models()
-    model_name, temperature, custom_function = None, None, None
-    for model_settings in settings.get('ai_annotators', []):
-        if data['annotator_id'] == model_settings['annotator_id']:
-            model_name, temperature, custom_function = create_function_call(model_settings, array_format=False)
-            break
-    if not model_name:
+    
+    
+    all_records = create_annotation_records(project_dir, llm_models, annotator_id = data['annotator_id'], settings = settings)
+    if not all_records:
         return jsonify({'error': 'Model not found'})
-    
-    def create_text_from_record(record, columns):
-        txt = ''
-        read_columns = [col for col in columns if columns[col].get('content', False)]
-        missing_columns = set(read_columns).difference(set(record.keys()))
-        if missing_columns:
-            logger.error(f"Record is missing the following columns: {missing_columns}")
-            return None
-        for col in columns:
-            if col in record:
-                if columns[col].get('label', False):
-                    txt += f"{col}: {record[col]}\n"
-        return txt
-    
-    all_records = []
-    if os.path.exists(project_dir):
-        for file in os.listdir(project_dir):
-            if file.endswith('.csv'):
-                file_path = os.path.join(project_dir, file)
-                df = pd.read_csv(file_path).fillna('')
-                recs = df.to_dict(orient='records')
-
-                for rec_id, rec in enumerate(recs):
-                    txt = create_text_from_record(rec, settings['columns'])
-                    if not txt:
-                        continue
-                    all_records.append({
-                        'txt': txt,
-                        'file': file.replace('.csv', ''),
-                        'id': rec_id
-                    })
+    all_annotations = async_analyze.process_texts(all_records, async_orchestrate, progress_id = task_id)
+    #print(all_annotations)
     annotation_results = {}
-    for i, record in enumerate(all_records):
+    for i, record in enumerate(all_annotations):
         current_file = record['file']
-
-        status_update = {'message': f'{int(100*i/10)}% complete', 'status': 'ongoing'}
-        update_status(status, status_update, annotation_status_file)
-        txt = record['txt']
-        llm_client = llm_models[model_name]['client']
-        response_msg, response, nr_tokens = llm_orchestrate(model_name, txt, custom_function, temperature, llm_client)
-        annotation_results[str(record['id'])] = response_msg
+        response_msg = record['response']
+        if response_msg:
+            annotation_results[str(record['id'])] = response_msg
         if i < len(all_records)-1:
             active_file = all_records[i+1]['file']
         else:
@@ -335,30 +306,33 @@ def annotate_model(project):
             with open(os.path.join(project_annotations_dir, f"{current_file}_annotations.json"), 'w') as f:
                 json.dump(annotation_data, f, indent=2)
             annotation_results = {}
-        #time.sleep(0.25)
-    status_update = {'message': f'Completed', 'status': 'completed'}
-    update_status(status, status_update, annotation_status_file)
     return jsonify({'status': 'completed'})
+
 
 @app.route('/annotation_status/<project>/<annotator_id>')
 def annotation_status(project, annotator_id):
-    annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{annotator_id}_annotation_status.json") 
-    if os.path.exists(annotation_status_file):
-        with open(annotation_status_file, 'r') as f:
-            return jsonify(json.load(f))
-    else:
-        return jsonify({'message': f'Starting', 'status': 'ongoing'})
+    progress = async_analyze.get_progress(annotator_id)
+    if progress:
+        print(f"data: {json.dumps(progress)}\n\n")
+        if (progress['current'] >= progress['total']) and (progress['total'] > 0):
+            async_analyze.clean_up_progress(annotator_id)
+            return jsonify({'message': 'Completed', 'status': 'completed'})
+        return jsonify({'message': f'{progress["percentage"]}% complete', 'status': 'ongoing'})
+    return jsonify({'message': 'Waiting...', 'status': 'ongoing'})
+
 
 @app.route('/annotation_status/<project>/<annotator_id>/<model_id0>/<model_id1>')
 def annotation_status_judge(project, annotator_id, model_id0, model_id1):
-    annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{annotator_id}_annotation_status.json") 
-    if os.path.exists(annotation_status_file):
-        if ('judges' in json.load(open(annotation_status_file, 'r'))):
-            return jsonify(json.load(open(annotation_status_file, 'r'))['judges'][model_id0][model_id1])
-        else:
-            return jsonify({'message': f'Starting', 'status': 'ongoing'})
-    else:
-        return jsonify({'message': f'Starting', 'status': 'ongoing'})
+    progress = async_analyze.get_progress(annotator_id)
+    return jsonify({'message': "Judges model vs model not implemented yet",'status': 'error'})
+    progress_id = f"{annotator_id}_M0:{model_id0}_M1:{model_id1}"
+    if progress:
+        print(f"data: {json.dumps(progress)}\n\n")
+        if (progress['current'] >= progress['total']) and (progress['total'] > 0):
+            async_analyze.clean_up_progress(progress_id)
+            return jsonify({'message': 'Completed', 'status': 'completed'})
+        return jsonify({'message': f'{progress["percentage"]}% complete', 'status': 'ongoing'})
+    return jsonify({'message': 'Waiting...', 'status': 'ongoing'})
 
 @app.route('/scores/<project>/<annotator_id>')
 def get_scores(project, annotator_id):

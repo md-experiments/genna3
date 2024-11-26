@@ -5,16 +5,15 @@ import time
 import uuid
 from typing import Callable, List, Dict, Any
 
-class AsyncSpellChecker:
-    def __init__(self, analyzer_function: Callable[[str], Dict[str, Any]], max_workers: int = None):
+class AsyncFunction:
+    def __init__(self, max_workers: int = None):
         """
-        Initialize AsyncSpellChecker with a spell checking function.
+        Initialize AsyncFunction with a spell checking function.
         
         Args:
             analyzer_function: Function that takes a textt and returns a dictionary
             max_workers: Number of processes for parallel processing
         """
-        self.analyzer_function = analyzer_function
         self.process_pool = ProcessPoolExecutor(max_workers=max_workers)
         self.progress_data = {}
         
@@ -27,7 +26,7 @@ class AsyncSpellChecker:
             'last_update': time.time()
         }
 
-    async def _spell_check_text_batch(self, texts: List[str], start_idx: int, 
+    async def _process_texts_batch(self, texts: List[str], analyzer_function: Callable[[Dict[str, Any]], Dict[str, Any]], start_idx: int, 
                                     progress_id: str, total: int) -> List[Dict]:
         """Process a batch of texts using the spell checker function"""
         loop = asyncio.get_event_loop()
@@ -37,7 +36,7 @@ class AsyncSpellChecker:
             # Run spell check function in process pool to avoid blocking
             result = await loop.run_in_executor(
                 self.process_pool,
-                self.analyzer_function,
+                analyzer_function,
                 text
             )
             results.append(result)
@@ -45,8 +44,8 @@ class AsyncSpellChecker:
             
         return results
 
-    async def _process_texts(self, texts: List[str], progress_id: str, 
-                           batch_size: int = 10) -> List[Dict]:
+    async def _process_texts(self, texts: List[str], analyzer_function: Callable[[Dict[str, Any]], Dict[str, Any]],
+                           progress_id: str, batch_size: int = 10) -> List[Dict]:
         """
         Process all texts in batches to avoid overwhelming the system.
         
@@ -61,14 +60,14 @@ class AsyncSpellChecker:
         results = []
         for i in range(0, total, batch_size):
             batch = texts[i:i + batch_size]
-            batch_results = await self._spell_check_text_batch(
-                batch, i, progress_id, total
+            batch_results = await self._process_texts_batch(
+                batch, analyzer_function, i, progress_id, total
             )
             results.extend(batch_results)
             
         return results
 
-    def process_texts(self, texts: List[str], progress_id: str, 
+    def process_texts(self, texts: List[str], analyzer_function: Callable[[Dict[str, Any]], Dict[str, Any]], progress_id: str, 
                      batch_size: int = 10) -> List[Dict]:
         """
         Main entry point for processing texts.
@@ -82,7 +81,7 @@ class AsyncSpellChecker:
         asyncio.set_event_loop(loop)
         try:
             results = loop.run_until_complete(
-                self._process_texts(texts, progress_id, batch_size)
+                self._process_texts(texts, analyzer_function, progress_id, batch_size)
             )
             return results
         finally:

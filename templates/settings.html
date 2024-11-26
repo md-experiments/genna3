@@ -760,6 +760,7 @@ function pollAnnotationProgress(model, element) {
                     }, 1500);
                 } else if (data.status === 'error') {
                     progressStatus.textContent = data.message || 'Error during annotation';
+                    alert(data.message || 'Error during annotation');
                     setTimeout(() => {
                         progressOverlay.style.display = 'none';
                     }, 1500);
