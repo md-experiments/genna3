@@ -1,7 +1,8 @@
 import os
-from ollama import Client
 import json
 from src.utils import num_tokens_from_string, log_traceback
+from ollama import Client
+import anthropic
 from openai import OpenAI
 from src.logger import logger
 import time
@@ -27,6 +28,8 @@ def llm_orchestrate(model_name, user_message, custom_functions, temperature, llm
         return call_ollama(model_name, user_message, custom_functions, temperature)
     elif llm_client == 'openai':
         return call_openai(model_name, user_message, custom_functions, temperature)
+    elif llm_client == 'anthropic':
+        return call_anthropic(model_name, user_message, custom_functions, temperature)
     elif llm_client == 'dummy':
         return call_dummy(model_name, user_message, custom_functions, temperature)
     else:
@@ -107,13 +110,67 @@ def call_dummy(model_name, user_message, custom_functions, temperature, max_toke
             'prompt_tokens': 0
         }
     except Exception as e:
-        print('Error in Dummy call')
-        print(log_traceback())
+        logger.error('Error in Dummy call')
+        logger.error(log_traceback())
         return 'error', f'Error Dummy: {e}', None, None
     return 'ok',response_msg, None, nr_tokens
 
+def call_anthropic(model_name, user_message, custom_functions, temperature, max_tokens=1024):
+    """ Call the Anthropic API
+
+    Args:
+        model_name (str): Name of the model
+        user_message (str): The user message
+        custom_functions (list): List of custom functions
+        temperature (float): Temperature
+        max_tokens (int): Maximum tokens
+
+    Returns:
+        tuple: Tuple containing the status, response message, response object and number of tokens
+    
+    """
+    #logger.info(f'BEGIN {user_message[:30]}')
+    try:
+        tools = custom_functions.copy()
+        assert(len(tools) == 1)
+        if 'parameters' in tools[0]:
+            tools[0]['input_schema'] = tools[0]['parameters']
+            del tools[0]['parameters']
+        tool_name = tools[0]['name']
+        client = anthropic.Anthropic(
+            # defaults to os.environ.get("ANTHROPIC_API_KEY")
+            api_key=os.environ.get("ANTHROPIC_API_KEY"),
+        )
+        response = client.messages.create(
+            #system=f'Use the tool {tool_name} to extract information from the text',
+            model=model_name,
+            max_tokens=max_tokens,
+            tools=tools,
+            temperature=temperature,
+            messages=[{"role": "user", "content": user_message}]
+        )
+        
+        for content in response.content:
+            if content.type == "tool_use" and content.name == tool_name:
+                response_msg = content.input
+                break
+            else:
+                response_msg = {}
+        nr_tokens = {
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+            "total_tokens": response.usage.input_tokens + response.usage.output_tokens
+            }
+        #logger.info(f'END {user_message[:30]}')
+    except Exception as e:
+        logger.error('Error in Anthropic call')
+        logger.error(log_traceback())
+        return 'error', f'Error Anthropic: {e}', None, None
+    return 'ok', response_msg, response, nr_tokens
+
 def call_openai(model_name, user_message, custom_functions, temperature, max_tokens=1024):
     try:
+        #logger.info(f'BEGIN {user_message[:20]}')
         function_name = custom_functions[0]['name']
         client = OpenAI()
         #try:
@@ -130,8 +187,8 @@ def call_openai(model_name, user_message, custom_functions, temperature, max_tok
         try:
             response_msg = json.loads(response_msg)
         except Exception as e:
-            print('Error in JSON conversion')
-            print(log_traceback())
+            logger.error('Error in JSON conversion')
+            logger.error(log_traceback())
             return 'error', f'OpenAI: Error in JSON conversion {e}', None, None
 
         nr_tokens = {
@@ -139,9 +196,10 @@ def call_openai(model_name, user_message, custom_functions, temperature, max_tok
             'total_tokens': response.usage.total_tokens,
             'prompt_tokens': response.usage.prompt_tokens
         }
+        #logger.info(f'END {user_message[:20]}')
     except Exception as e:
-        print('Error in OpenAI call')
-        print(log_traceback())
+        logger.error('Error in OpenAI call')
+        logger.error(log_traceback())
         return 'error', f'Error OpenAI: {e}', None, None
     return 'ok', response_msg, response, nr_tokens
 
@@ -170,7 +228,7 @@ def call_ollama(model_name, user_message, custom_functions, temperature, max_tok
             'prompt_tokens': prompt_tokens
         }
     except Exception as e:
-        print('Error in Ollama call')
+        logger.error('Error in Ollama call')
         logger.error(log_traceback())
         return 'error', f'Error Ollama: {e}', None, None
     return 'ok', message, response, nr_tokens

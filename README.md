@@ -1,12 +1,12 @@
 <h1><img alt='Genna logo' src='static/logo.png' width='40' align='left' style="padding:1px 5px 1px 1px;"/>Genna - Generative Annotation System </h1>
   
-
 Genna (GENerative ANNotation) is a LLM-centric text annotation system designed for efficient text annotation and comparison of AI model outputs.
+Genna makes it easy to test out different LLMs, prompts, temperature and scalability of structured calls.
 
 ## Key Features at a Glance
-- 📊 **CSV File Management**: Upload, manage, and annotate CSV files
-- 🤖 **AI Model Integration**: Configure multiple AI models as annotators
-- 📋 **Annotation Interface**: 
+- 🤖 **AI Model Integration**: Configure multiple AI models as annotators: supports OpenAI, Anthropic and Ollama
+- 📊 **Custom Dataset Management**: Evolve your dataset, add new files, remove files, while keeping track of metrics
+- 📋 **Human Annotation Interface**: 
   - Interactive annotation with thumbs up/down feedback
   - Real-time disagreement detection between AI models
   - Expandable annotation view for each row

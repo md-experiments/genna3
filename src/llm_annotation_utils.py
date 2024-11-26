@@ -10,10 +10,9 @@ def create_text_from_record(record, columns):
     if missing_columns:
         logger.error(f"Record is missing the following columns: {missing_columns}")
         return None
-    for col in columns:
+    for col in read_columns:
         if col in record:
-            if columns[col].get('label', False):
-                txt += f"{col}: {record[col]}\n"
+            txt += f"{col}: {record[col]}\n"
     return txt
 
 def get_annotator_settings(settings, annotator_id):

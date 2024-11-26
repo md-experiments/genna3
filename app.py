@@ -292,6 +292,8 @@ def annotate_model_async(project):
     #print(all_annotations)
     annotation_results = {}
     for i, record in enumerate(all_annotations):
+        if record['status'] == 'error':
+            continue
         current_file = record['file']
         response_msg = record['response']
         if response_msg:
@@ -313,7 +315,7 @@ def annotate_model_async(project):
 def annotation_status(project, annotator_id):
     progress = async_analyze.get_progress(annotator_id)
     if progress:
-        print(f"data: {json.dumps(progress)}\n\n")
+        #print(f"data: {json.dumps(progress)}\n\n")
         if (progress['current'] >= progress['total']) and (progress['total'] > 0):
             async_analyze.clean_up_progress(annotator_id)
             return jsonify({'message': 'Completed', 'status': 'completed'})

@@ -1,5 +1,7 @@
 flask
 pandas
-aiohttp
+openai
+anthropic
+ollama
 PyYAML
 tqdm
