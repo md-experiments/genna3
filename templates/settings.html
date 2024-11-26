@@ -1,4 +1,3 @@
-<!-- Previous code remains unchanged until addAnnotatorBtn.onclick -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -207,7 +206,7 @@
     }
 </style>
 </head>
-<body>
+<body data-project="{{ project }}">
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container-fluid">
             <a class="navbar-brand" href="/">
@@ -228,14 +227,29 @@
         
         <div class="card mt-4">
             <div class="card-body">
-                <h5 class="card-title">Project Objective</h5>
-                <textarea id="projectObjective" class="form-control" rows="4" placeholder="Enter project objective..."></textarea>
+                <h5 class="card-title">1. Project Objective</h5>
+                <textarea id="projectObjective" class="form-control" rows="1" placeholder="Enter project objective..."></textarea>
             </div>
         </div>
-
         <div class="card mt-4">
             <div class="card-body">
-                <h5 class="card-title">Column Management</h5>
+                <h5 class="card-title">2. Project Files</h5>
+                <div class="col">
+                    <div class="d-flex gap-2 align-items-center">
+
+                        <button class="btn btn-primary" onclick="document.getElementById('fileUpload').click()">
+                            <i class="bi bi-upload"></i> Upload CSV
+                        </button>
+                    </div>
+                </div>
+                <div id="projectFilesContainer" class="columns-container">
+                    <!-- Columns will be added here dynamically -->
+                </div>
+            </div>
+        </div>
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">3. Column Management</h5>
                 <p class="text-muted mb-2">Configure how each column is used in the annotation process.</p>
                 <div class="mb-2">
                     <i class="bi bi-eye text-primary me-2"></i> Show
@@ -251,7 +265,7 @@
 
         <div class="card mt-4">
             <div class="card-body">
-                <h5 class="card-title">AI Models</h5>
+                <h5 class="card-title">4. AI Models</h5>
                 <p class="text-muted">Configure AI models for annotation and judgment.</p>
 
                 <div class="ai-models-container mb-4">
@@ -268,45 +282,46 @@
                         </div>
                     </div>
                 </div>
-<div class="card">
-    <div class="card-body">
-        <h6 class="mb-3">Add New Model</h6>
-        <div class="annotator-form mb-3">
-            <div class="annotator-form-row">
-                <input type="text" id="newAnnotatorName" class="form-control" placeholder="Unique Name" style="width: auto;">
-                <select id="newAnnotatorModel" class="form-control" style="width: auto;">
-                    <option value="">Select Model</option>
-                    <!-- Models will be loaded here -->
-                </select>
-                <input type="number" id="newAnnotatorTemp" class="form-control" placeholder="Temperature" min="0" max="1" step="0.1" style="width: 120px;">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="mb-3">Add New Model</h6>
+                    <div class="annotator-form mb-3">
+                        <div class="annotator-form-row">
+                            <input type="text" id="newAnnotatorName" class="form-control" placeholder="Unique Name" style="width: auto;">
+                            <select id="newAnnotatorModel" class="form-control" style="width: auto;">
+                                <option value="">Select Model</option>
+                                <!-- Models will be loaded here -->
+                            </select>
+                            <input type="number" id="newAnnotatorTemp" class="form-control" placeholder="Temperature" min="0" max="1" step="0.1" style="width: 120px;">
+                        </div>
+                        <textarea id="newAnnotatorPrompt" class="form-control model-prompt" placeholder="Base prompt template"></textarea>
+                    </div>
+                    <div class="role-checkboxes mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="isAnnotator">
+                            <label class="form-check-label" for="isAnnotator">Annotator</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="isJudge">
+                            <label class="form-check-label" for="isJudge">Judge</label>
+                        </div>
+                    </div>
+                    <div id="judgeAnnotators" class="judge-annotators" style="display: none;">
+                        <select id="judgeAnnotator1" class="form-control judge-annotator-select">
+                            <option value="">Select First Annotator</option>
+                        </select>
+                        <select id="judgeAnnotator2" class="form-control judge-annotator-select">
+                            <option value="">Select Second Annotator</option>
+                        </select>
+                    </div>
+                    <div id="labelConfigs">
+                        <!-- Label configurations will be added here -->
+                    </div>
+                    <button class="btn btn-outline-secondary" type="button" id="addAnnotatorBtn">Add Model</button>
+                </div>
             </div>
-            <textarea id="newAnnotatorPrompt" class="form-control model-prompt" placeholder="Base prompt template"></textarea>
         </div>
-        <div class="role-checkboxes mb-3">
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="isAnnotator">
-                <label class="form-check-label" for="isAnnotator">Annotator</label>
-            </div>
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="isJudge">
-                <label class="form-check-label" for="isJudge">Judge</label>
-            </div>
-        </div>
-        <div id="judgeAnnotators" class="judge-annotators" style="display: none;">
-            <select id="judgeAnnotator1" class="form-control judge-annotator-select">
-                <option value="">Select First Annotator</option>
-            </select>
-            <select id="judgeAnnotator2" class="form-control judge-annotator-select">
-                <option value="">Select Second Annotator</option>
-            </select>
-        </div>
-        <div id="labelConfigs">
-            <!-- Label configurations will be added here -->
-        </div>
-        <button class="btn btn-outline-secondary" type="button" id="addAnnotatorBtn">Add Model</button>
     </div>
-</div>
-
 <div class="mt-4 mb-4">
     <button id="saveSettingsBtn" class="btn btn-primary">Save Settings</button>
 </div>
@@ -323,158 +338,173 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const modeSwitch = document.getElementById('modeSwitch');
-        const projectObjective = document.getElementById('projectObjective');
-        const columnsContainer = document.getElementById('columnsContainer');
-        const annotatorsList = document.getElementById('annotatorsList');
-        const judgesList = document.getElementById('judgesList');
-        const isAnnotator = document.getElementById('isAnnotator');
-        const isJudge = document.getElementById('isJudge');
-        const addAnnotatorBtn = document.getElementById('addAnnotatorBtn');
-        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-        const newAnnotatorLabelPrompts = document.getElementById('newAnnotatorLabelPrompts');
+    let availableModels = [];
+    let lastModelSettings = null;
 
-        let availableModels = [];
-        let lastModelSettings = null;
+    // Upload file
+    function uploadFile(input) {
+            if (!input.files.length) return;
 
-        // Dark mode handling
-        if (localStorage.getItem('darkMode') === 'true') {
-            document.body.classList.add('dark-mode');
-            modeSwitch.checked = true;
+            const file = input.files[0];
+            if (!file.name.endsWith('.csv')) {
+                alert('Please select a CSV file');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('project', document.body.getAttribute('data-project'));
+
+            fetch('/upload_csv', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    loadSettings();
+                    input.value = '';
+                }
+            });
         }
 
-        modeSwitch.addEventListener('change', () => {
-            document.body.classList.toggle('dark-mode');
-            localStorage.setItem('darkMode', modeSwitch.checked);
-        });
 
-// Judge checkbox handler
-isJudge.addEventListener('change', function() {
-    // Simply toggle the checkbox, no need to show annotator selection
-    if (this.checked) {
-        isAnnotator.checked = false; // Can't be both annotator and judge
-    }
-});
+        // Initial load
+        function loadSettings() {
+            fetch(`/get_project_settings/{{ project }}`)
+                .then(response => response.json())
+                .then(data => {
+                    const settings = data.settings;
+                    const columns = data.columns;
 
-function generateAnnotatorId(model) {
-    // Create a hash from model details plus random component
-    const randomStr = Math.random().toString(36).substring(2, 15);
-    const modelString = `${model.model_name}-${model.temperature}-${Object.entries(model.label_types || {}).join('-')}-${randomStr}`;
-    return btoa(modelString).replace(/[^a-zA-Z0-9]/g, '');
-}
+                    availableModels = data.available_models;
+                    
+                    projectObjective.value = settings.objective || '';
+                    
+                    const modelSelect = document.getElementById('newAnnotatorModel');
+                    modelSelect.innerHTML = '<option value="">Select Model</option>' +
+                        availableModels.map(model => `<option value="${model}">${model}</option>`).join('');
+                    
 
-function validateAnnotatorFields() {
-    const name = document.getElementById('newAnnotatorName').value.trim();
-    const model = document.getElementById('newAnnotatorModel').value.trim();
-    const temp = parseFloat(document.getElementById('newAnnotatorTemp').value);
-    const prompt = document.getElementById('newAnnotatorPrompt').value.trim();
-    const hasRole = isAnnotator.checked || isJudge.checked;
+                    const project = document.body.getAttribute('data-project');
+                    fetch(`/get_project_files/${project}`)
+                        .then(response => response.json())
+                        .then(files => {
+                            projectFilesContainer.innerHTML = '';
+                            if (files.length > 0) {
+                                
+                                    files.forEach(filename => {
+                                        projectFilesContainer.appendChild(createFileElement(filename));
+                                    });
+                                // loadFileData(files[0]);
+                            }
+                        });
+                    columnsContainer.innerHTML = '';
+                    columns.forEach(column => {
+                        const columnSettings = settings.columns[column] || {
+                            show: true,
+                            label: false,
+                            content: false,
+                            filter: false
+                        };
+                        columnsContainer.appendChild(createColumnElement(column, columnSettings));
+                    });
 
-    if (!name) {
-        alert('Please enter a unique name');
-        return false;
-    }
-    if (!model) {
-        alert('Please select a model');
-        return false;
-    }
-    if (isNaN(temp) || temp < 0 || temp > 1) {
-        alert('Temperature must be between 0 and 1');
-        return false;
-    }
-    if (!prompt) {
-        alert('Please enter a base prompt');
-        return false;
-    }
-    if (!hasRole) {
-        alert('Please select at least one role (Annotator or Judge)');
-        return false;
+                    annotatorsList.innerHTML = '';
+                    judgesList.innerHTML = '';
+                    const models = settings.ai_annotators || [];
+                    models.forEach(model => {
+                        if (model.roles?.includes('annotator')) {
+                            annotatorsList.appendChild(createModelElement(model));
+                        }
+                        if (model.roles?.includes('judge')) {
+                            judgesList.appendChild(createModelElement(model));
+                        }
+                    });
+
+                    if (models.length > 0) {
+                        lastModelSettings = models[models.length - 1];
+                        document.getElementById('newAnnotatorModel').value = lastModelSettings.model_name;
+                        document.getElementById('newAnnotatorTemp').value = lastModelSettings.temperature;
+                        document.getElementById('newAnnotatorPrompt').value = lastModelSettings.prompt;
+                    }
+
+                    updateLabelConfigs();
+                });
+        }
+
+function createFileElement(filename) {
+    const div = document.createElement('div');
+        div.className = 'column-item';
+        div.innerHTML = `
+            <div class="column-name">${filename}</div>
+                    `;
+        return div;
     }
 
-    // Check if name is unique
-    const existingNames = new Set();
-    document.querySelectorAll('.model-item').forEach(item => {
-        existingNames.add(item.getAttribute('data-annotator-name'));
-    });
-    if (existingNames.has(name)) {
-        alert('This name is already in use. Please choose a unique name.');
-        return false;
-    }
 
-    const labelInputs = document.querySelectorAll('#labelConfigs input');
-    if (labelInputs.length > 0) {
-        let allPromptsValid = true;
-        labelInputs.forEach(input => {
-            if (!input.value.trim()) {
-                alert(`Please enter a prompt for ${input.dataset.column}`);
-                allPromptsValid = false;
-            }
-        });
-        if (!allPromptsValid) return false;
-    }
-
-    return true;
-}
  // Model element creation and management
-function createColumnElement(columnName, settings) {
-            const div = document.createElement('div');
-            div.className = 'column-item';
-            div.innerHTML = `
-                <div class="column-name">${columnName}</div>
-                <div class="action-buttons">
-                    <button class="action-btn show ${settings.show ? 'active' : ''}" data-action="show" title="Show">
-                        <i class="bi bi-eye"></i>
-                    </button>
-                    <button class="action-btn label ${settings.label ? 'active' : ''}" data-action="label" title="Label">
-                        <i class="bi bi-tag"></i>
-                    </button>
-                    <button class="action-btn content ${settings.content ? 'active' : ''}" data-action="content" title="Content">
-                        <i class="bi bi-body-text"></i>
-                    </button>
-                    <button class="action-btn filter ${settings.filter ? 'active' : ''}" data-action="filter" title="Filter">
-                        <i class="bi bi-funnel"></i>
-                    </button>
+ function createColumnElement(columnName, settings) {
+        const div = document.createElement('div');
+        div.className = 'column-item';
+        div.innerHTML = `
+            <div class="column-name">${columnName}</div>
+            <div class="action-buttons">
+                <button class="action-btn show ${settings.show ? 'active' : ''}" data-action="show" title="Show">
+                    <i class="bi bi-eye"></i>
+                </button>
+                <button class="action-btn label ${settings.label ? 'active' : ''}" data-action="label" title="Label">
+                    <i class="bi bi-tag"></i>
+                </button>
+                <button class="action-btn content ${settings.content ? 'active' : ''}" data-action="content" title="Content">
+                    <i class="bi bi-body-text"></i>
+                </button>
+                <button class="action-btn filter ${settings.filter ? 'active' : ''}" data-action="filter" title="Filter">
+                    <i class="bi bi-funnel"></i>
+                </button>
+            </div>
+        `;
+
+        div.querySelectorAll('.action-btn').forEach(btn => {
+            btn.onclick = function() {
+                this.classList.toggle('active');
+                if (btn.classList.contains('label')) {
+                    updateLabelConfigs();
+                }
+            };
+        });
+
+        return div;
+    }
+
+    function updateLabelConfigs() {
+        const labelColumns = Array.from(document.querySelectorAll('.action-btn.label.active'))
+            .map(btn => btn.closest('.column-item').querySelector('.column-name').textContent);
+
+        const labelConfigs = document.getElementById('labelConfigs');
+        labelConfigs.innerHTML = labelColumns.map(column => {
+            const savedType = lastModelSettings?.label_types?.[column] || 'text';
+            const savedPrompt = lastModelSettings?.label_prompts?.[column] || '';
+            
+            return `
+                <div class="label-config">
+                    <small class="text-muted">${column}:</small>
+                    <select class="label-type-select" data-column="${column}">
+                        <option value="text" ${savedType === 'text' ? 'selected' : ''}>Text</option>
+                        <option value="bool" ${savedType === 'bool' ? 'selected' : ''}>Bool</option>
+                        <option value="number" ${savedType === 'number' ? 'selected' : ''}>Number</option>
+                    </select>
+                    <input type="text" class="form-control" placeholder="Prompt for ${column}" 
+                            data-column="${column}" value="${savedPrompt}">
                 </div>
             `;
+        }).join('');
+    }
 
-            div.querySelectorAll('.action-btn').forEach(btn => {
-                btn.onclick = function() {
-                    this.classList.toggle('active');
-                    if (btn.classList.contains('label')) {
-                        updateLabelConfigs();
-                    }
-                };
-            });
 
-            return div;
-        }
-
-        function updateLabelConfigs() {
-            const labelColumns = Array.from(document.querySelectorAll('.action-btn.label.active'))
-                .map(btn => btn.closest('.column-item').querySelector('.column-name').textContent);
-
-            const labelConfigs = document.getElementById('labelConfigs');
-            labelConfigs.innerHTML = labelColumns.map(column => {
-                const savedType = lastModelSettings?.label_types?.[column] || 'text';
-                const savedPrompt = lastModelSettings?.label_prompts?.[column] || '';
-                
-                return `
-                    <div class="label-config">
-                        <small class="text-muted">${column}:</small>
-                        <select class="label-type-select" data-column="${column}">
-                            <option value="text" ${savedType === 'text' ? 'selected' : ''}>Text</option>
-                            <option value="bool" ${savedType === 'bool' ? 'selected' : ''}>Bool</option>
-                            <option value="number" ${savedType === 'number' ? 'selected' : ''}>Number</option>
-                        </select>
-                        <input type="text" class="form-control" placeholder="Prompt for ${column}" 
-                               data-column="${column}" value="${savedPrompt}">
-                    </div>
-                `;
-            }).join('');
-        }
-
-function createModelElement(model) {
+    function createModelElement(model) {
     const labels = Object.entries(model.label_types || {})
         .map(([column, type]) => `${column} (${type})`)
         .join(', ');
@@ -612,6 +642,68 @@ function createModelElement(model) {
     return div;
 }
 
+
+function generateAnnotatorId(model) {
+    // Create a hash from model details plus random component
+    const randomStr = Math.random().toString(36).substring(2, 15);
+    const modelString = `${model.model_name}-${model.temperature}-${Object.entries(model.label_types || {}).join('-')}-${randomStr}`;
+    return btoa(modelString).replace(/[^a-zA-Z0-9]/g, '');
+}
+
+function validateAnnotatorFields() {
+    const name = document.getElementById('newAnnotatorName').value.trim();
+    const model = document.getElementById('newAnnotatorModel').value.trim();
+    const temp = parseFloat(document.getElementById('newAnnotatorTemp').value);
+    const prompt = document.getElementById('newAnnotatorPrompt').value.trim();
+    const hasRole = isAnnotator.checked || isJudge.checked;
+
+    if (!name) {
+        alert('Please enter a unique name');
+        return false;
+    }
+    if (!model) {
+        alert('Please select a model');
+        return false;
+    }
+    if (isNaN(temp) || temp < 0 || temp > 1) {
+        alert('Temperature must be between 0 and 1');
+        return false;
+    }
+    if (!prompt) {
+        alert('Please enter a base prompt');
+        return false;
+    }
+    if (!hasRole) {
+        alert('Please select at least one role (Annotator or Judge)');
+        return false;
+    }
+
+    // Check if name is unique
+    const existingNames = new Set();
+    document.querySelectorAll('.model-item').forEach(item => {
+        existingNames.add(item.getAttribute('data-annotator-name'));
+    });
+    if (existingNames.has(name)) {
+        alert('This name is already in use. Please choose a unique name.');
+        return false;
+    }
+
+    const labelInputs = document.querySelectorAll('#labelConfigs input');
+    if (labelInputs.length > 0) {
+        let allPromptsValid = true;
+        labelInputs.forEach(input => {
+            if (!input.value.trim()) {
+                alert(`Please enter a prompt for ${input.dataset.column}`);
+                allPromptsValid = false;
+            }
+        });
+        if (!allPromptsValid) return false;
+    }
+
+    return true;
+}
+
+
 // Annotation and scoring functions
 function startAnnotation(model, element) {
     const progressOverlay = element.querySelector('.progress-overlay');
@@ -667,7 +759,7 @@ function pollAnnotationProgress(model, element) {
                         loadModelScores(model, element);
                     }, 1500);
                 } else if (data.status === 'error') {
-                    progressStatus.textContent = 'Error during annotation';
+                    progressStatus.textContent = data.message || 'Error during annotation';
                     setTimeout(() => {
                         progressOverlay.style.display = 'none';
                     }, 1500);
@@ -822,55 +914,41 @@ saveSettingsBtn.onclick = () => {
 };
 
 
-        // Initial load
-        function loadSettings() {
-            fetch(`/get_project_settings/{{ project }}`)
-                .then(response => response.json())
-                .then(data => {
-                    const settings = data.settings;
-                    const columns = data.columns;
-                    availableModels = data.available_models;
-                    
-                    projectObjective.value = settings.objective || '';
-                    
-                    const modelSelect = document.getElementById('newAnnotatorModel');
-                    modelSelect.innerHTML = '<option value="">Select Model</option>' +
-                        availableModels.map(model => `<option value="${model}">${model}</option>`).join('');
-                    
-                    columnsContainer.innerHTML = '';
-                    columns.forEach(column => {
-                        const columnSettings = settings.columns[column] || {
-                            show: true,
-                            label: false,
-                            content: false,
-                            filter: false
-                        };
-                        columnsContainer.appendChild(createColumnElement(column, columnSettings));
-                    });
 
-                    annotatorsList.innerHTML = '';
-                    judgesList.innerHTML = '';
-                    const models = settings.ai_annotators || [];
-                    models.forEach(model => {
-                        if (model.roles?.includes('annotator')) {
-                            annotatorsList.appendChild(createModelElement(model));
-                        }
-                        if (model.roles?.includes('judge')) {
-                            judgesList.appendChild(createModelElement(model));
-                        }
-                    });
+document.addEventListener('DOMContentLoaded', () => {
+        const modeSwitch = document.getElementById('modeSwitch');
+        const projectObjective = document.getElementById('projectObjective');
+        const columnsContainer = document.getElementById('columnsContainer');
+        const projectFilesContainer = document.getElementById('projectFilesContainer');
+        const annotatorsList = document.getElementById('annotatorsList');
+        const judgesList = document.getElementById('judgesList');
+        const isAnnotator = document.getElementById('isAnnotator');
+        const isJudge = document.getElementById('isJudge');
+        const addAnnotatorBtn = document.getElementById('addAnnotatorBtn');
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+        const newAnnotatorLabelPrompts = document.getElementById('newAnnotatorLabelPrompts');
 
-                    if (models.length > 0) {
-                        lastModelSettings = models[models.length - 1];
-                        document.getElementById('newAnnotatorModel').value = lastModelSettings.model_name;
-                        document.getElementById('newAnnotatorTemp').value = lastModelSettings.temperature;
-                        document.getElementById('newAnnotatorPrompt').value = lastModelSettings.prompt;
-                    }
+        
 
-                    updateLabelConfigs();
-                });
+        // Dark mode handling
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+            modeSwitch.checked = true;
         }
 
+        modeSwitch.addEventListener('change', () => {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', modeSwitch.checked);
+        });
+
+
+// Judge checkbox handler
+isJudge.addEventListener('change', function() {
+    // Simply toggle the checkbox, no need to show annotator selection
+    if (this.checked) {
+        isAnnotator.checked = false; // Can't be both annotator and judge
+    }
+});
         loadSettings();
     });
 </script>
