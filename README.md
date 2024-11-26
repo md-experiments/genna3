@@ -20,49 +20,21 @@ Genna makes it easy to test out different LLMs, prompts, temperature and scalabi
   - Summary view showing differences between model outputs
   - Quick toggle to show/hide all annotations
 
-## Features
 
-### Project Management
-- Create and manage multiple annotation projects
-- Upload CSV files to projects
-- Configure which columns to show, label, use as content, or filter
-- Set project objectives and annotation guidelines
 
-### AI Models
-- Configure AI models (like GPT-3, GPT-4) as annotators or judges
-- Customize model parameters:
-  - Temperature for controlling randomness
-  - Custom prompts for different annotation tasks
-  - Label types (text, boolean, numeric)
 
-### Annotation System
-1. **Annotators**
-   - AI models configured to annotate text
-   - Each annotator has a unique name and configuration
-   - Can handle multiple label types per annotation
-   - Annotations are stored separately from source data
-   - Real-time visual feedback for model agreements/disagreements
-   - Interactive thumbs up/down interface for manual annotation
 
-2. **Annotation Interface**
-   - Expandable rows showing all model annotations
-   - Summary row indicating differences between model outputs
-   - Dark mode support for reduced eye strain
-   - Quick filters to show only rows with disagreements
-   - Bulk show/hide annotations across all rows
-
-3. **Judges**
-   - Special AI models that evaluate annotations
-   - Compare annotations from two different annotators
-   - Selected dynamically at annotation time
-   - Help evaluate annotation quality and consistency
-
-### Category Columns
-- Filter data using category columns
-- Multi-select filtering capabilities
-- Organize and manage annotations by categories
-- Quick text search within any column
-
+## Setup
+1. Start and environment and install requirements: 
+```
+conda create --name genna
+conda activate genna
+pip install -r requirements.txt
+```
+2. Start the application 
+```
+python app.py
+```
 ## Usage
 
 ### Setting Up a Project
@@ -110,6 +82,49 @@ Genna makes it easy to test out different LLMs, prompts, temperature and scalabi
 - Annotations stored separately from source files
 - Easy deletion of files when needed
 - Category-based filtering for better organization
+
+## Features
+
+### Project Management
+- Create and manage multiple annotation projects
+- Upload CSV files to projects
+- Configure which columns to show, label, use as content, or filter
+- Set project objectives and annotation guidelines
+
+### AI Models
+- Configure AI models (like GPT-3, GPT-4) as annotators or judges
+- Customize model parameters:
+  - Temperature for controlling randomness
+  - Custom prompts for different annotation tasks
+  - Label types (text, boolean, numeric)
+
+### Annotation System
+1. **Annotators**
+   - AI models configured to annotate text
+   - Each annotator has a unique name and configuration
+   - Can handle multiple label types per annotation
+   - Annotations are stored separately from source data
+   - Real-time visual feedback for model agreements/disagreements
+   - Interactive thumbs up/down interface for manual annotation
+
+2. **Annotation Interface**
+   - Expandable rows showing all model annotations
+   - Summary row indicating differences between model outputs
+   - Dark mode support for reduced eye strain
+   - Quick filters to show only rows with disagreements
+   - Bulk show/hide annotations across all rows
+
+3. **Judges**
+   - Special AI models that evaluate annotations
+   - Compare annotations from two different annotators
+   - Selected dynamically at annotation time
+   - Help evaluate annotation quality and consistency
+
+### Category Columns
+- Filter data using category columns
+- Multi-select filtering capabilities
+- Organize and manage annotations by categories
+- Quick text search within any column
 
 ## Technical Details
 
