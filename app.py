@@ -338,11 +338,36 @@ def annotation_status_judge(project, annotator_id, model_id0, model_id1):
 
 @app.route('/scores/<project>/<annotator_id>')
 def get_scores(project, annotator_id):
-    annotation_status_file = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR, f"{annotator_id}_annotation_scores.json") 
-    if os.path.exists(annotation_status_file):
-        with open(annotation_status_file, 'r') as f:
-            return jsonify(json.load(f))
-    return jsonify({'test': 1,'tes2t': 2})
+
+    annotation_path = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR) 
+    annotation_files = [f for f in os.listdir(annotation_path) if f.endswith('_annotations.json')]
+    scores = {
+            'totals': {},
+            'correct': {},
+            'manual': {}
+        }
+    for file in annotation_files:
+        with open(os.path.join(annotation_path, file), 'r') as f:
+            annotation_data = json.load(f)
+
+        if annotator_id in annotation_data['ai_annotations']:
+            manual_annotations = annotation_data['manual_annotations'].get(annotator_id, {})
+            for record in annotation_data['ai_annotations'][annotator_id]:
+                for field in annotation_data['ai_annotations'][annotator_id][record]:
+                    scores['totals'][field] = scores['totals'].get(field, 0) + 1
+                    if record in manual_annotations and field in manual_annotations[record]:
+                        scores['manual'][field] = scores['manual'].get(field, 0) + 1
+                        if manual_annotations[record][field]:
+                            scores['correct'][field] = scores['correct'].get(field, 0) + 1
+    formatted_scores = {}
+    for field in scores['totals']:
+        correct_score = scores['correct'].get(field,0) / scores['manual'].get(field,0) if scores['manual'].get(field,0) > 0 else 0
+        if scores['manual'].get(field,0) == 0:
+            formatted_scores[field] = f'{scores["totals"][field]} model, no manual annotations'
+        else:
+            formatted_scores[field] = f'{correct_score:.2f} ({scores["totals"][field]} model, {scores["manual"].get(field,0)} manual annotations)'
+
+    return jsonify(formatted_scores)
 
 @app.route('/delete_file', methods=['POST'])
 def delete_file():
