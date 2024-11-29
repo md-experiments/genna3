@@ -268,24 +268,27 @@ async_analyze = AsyncFunction(max_workers=4)
 @app.route('/annotate/<project>', methods=['POST'])
 def annotate_model_async(project):
     data = request.json
-    #print(data)
+    print(data)
     project_dir = os.path.join(BASE_DIR, project)
     project_annotations_dir = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR)
     os.makedirs(project_annotations_dir, exist_ok=True)
     #print(data)
     model_id = data['annotator_id']
     task_id = data['annotator_id']
+    settings = get_project_settings(project)
+    llm_models = load_llm_models()
     if 'selected_annotators' in data:
         model0 = data['selected_annotators']['first']['id']
         model1 = data['selected_annotators']['second']['id']
-        task_id = f"{model_id}_M0:{model0}_M1:{model1}"
-        return jsonify({'message': "Judges model vs model not implemented yet",'status': 'error'})
-    settings = get_project_settings(project)
-
-    llm_models = load_llm_models()
+        field_name = data['selected_annotators']['field_name']
+        task_id = f"{model_id}_M0:{model0}_M1:{model1}_FLD:{field_name}"
+        #return jsonify({'message': "Judges model vs model not implemented yet",'status': 'error'})
+        all_records = create_annotation_records(project_dir, llm_models, annotator_id = data['annotator_id'], 
+                                                settings = settings, judges = [model0, model1], field_name = field_name)
+    else:
     
-    
-    all_records = create_annotation_records(project_dir, llm_models, annotator_id = data['annotator_id'], settings = settings)
+        all_records = create_annotation_records(project_dir, llm_models, annotator_id = data['annotator_id'], 
+                                                settings = settings)
     if not all_records:
         return jsonify({'error': 'Model not found'})
     all_annotations = async_analyze.process_texts(all_records, async_orchestrate, progress_id = task_id)
@@ -323,11 +326,11 @@ def annotation_status(project, annotator_id):
     return jsonify({'message': 'Waiting...', 'status': 'ongoing'})
 
 
-@app.route('/annotation_status/<project>/<annotator_id>/<model_id0>/<model_id1>')
-def annotation_status_judge(project, annotator_id, model_id0, model_id1):
-    progress = async_analyze.get_progress(annotator_id)
-    return jsonify({'message': "Judges model vs model not implemented yet",'status': 'error'})
-    progress_id = f"{annotator_id}_M0:{model_id0}_M1:{model_id1}"
+@app.route('/annotation_status/<project>/<annotator_id>/<model_id0>/<model_id1>/<field_name>')
+def annotation_status_judge(project, annotator_id, model_id0, model_id1, field_name):
+    progress_id = f"{annotator_id}_M0:{model_id0}_M1:{model_id1}_FLD:{field_name}"
+    progress = async_analyze.get_progress(progress_id)
+    #return jsonify({'message': "Judges model vs model not implemented yet",'status': 'error'})
     if progress:
         print(f"data: {json.dumps(progress)}\n\n")
         if (progress['current'] >= progress['total']) and (progress['total'] > 0):
@@ -340,7 +343,10 @@ def annotation_status_judge(project, annotator_id, model_id0, model_id1):
 def get_scores(project, annotator_id):
 
     annotation_path = os.path.join(BASE_DIR, project, ANNOTATIONS_DIR) 
+    os.makedirs(annotation_path, exist_ok=True)
     annotation_files = [f for f in os.listdir(annotation_path) if f.endswith('_annotations.json')]
+    if len(annotation_files) == 0:
+        return jsonify({'Scores': 'No annotations yet'})
     scores = {
             'totals': {},
             'correct': {},
@@ -389,4 +395,4 @@ def delete_file():
 
 if __name__ == '__main__':
     os.makedirs(BASE_DIR, exist_ok=True)
-    app.run(debug=True, port=434343)
+    app.run(debug=True, port=40000)

@@ -240,6 +240,7 @@
                         <button class="btn btn-primary" onclick="document.getElementById('fileUpload').click()">
                             <i class="bi bi-upload"></i> Upload CSV
                         </button>
+                        <input type="file" id="fileUpload" accept=".csv" style="display: none;" onchange="uploadFile(this)">
                     </div>
                 </div>
                 <div id="projectFilesContainer" class="columns-container">
@@ -312,6 +313,9 @@
                         </select>
                         <select id="judgeAnnotator2" class="form-control judge-annotator-select">
                             <option value="">Select Second Annotator</option>
+                        </select>
+                        <select id="judgeFieldName" class="form-control judge-annotator-select">
+                            <option value="">Select Field Name</option>
                         </select>
                     </div>
                     <div id="labelConfigs">
@@ -579,6 +583,12 @@ function createFileElement(filename) {
                                     <option value="">Select Annotator</option>
                                 </select>
                             </div>
+                            <div class="mb-3">
+                                <label class="form-label">Field to Judge</label>
+                                <select class="form-select judge-field-select">
+                                    <option value="">Select Field</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -600,11 +610,19 @@ function createFileElement(filename) {
                             id: m.annotator_id,
                             name: m.name
                         }));
+                    const columns = data.settings.columns;                        
+                    const fields = Object.keys(columns)
+                        .filter(key => columns[key].label === true);
 
                     const selects = modal.querySelectorAll('.judge-annotator-select');
                     selects.forEach(select => {
                         select.innerHTML = '<option value="">Select Annotator</option>' +
                             annotators.map(ann => `<option value="${ann.id}">${ann.name}</option>`).join('');
+                    });
+                    const fieldSelect = modal.querySelectorAll('.judge-field-select');
+                    fieldSelect.forEach(select => {
+                        select.innerHTML = '<option value="">Select Field</option>' +
+                            fields.map(field => `<option value="${field}">${field}</option>`).join('');
                     });
                 });
 
@@ -613,6 +631,8 @@ function createFileElement(filename) {
                 const selects = modal.querySelectorAll('.judge-annotator-select');
                 const annotator1 = selects[0].value;
                 const annotator2 = selects[1].value;
+                const selectsField = modal.querySelectorAll('.judge-field-select');
+                const fieldName = selectsField[0].value;
 
                 if (!annotator1 || !annotator2) {
                     alert('Please select both annotators');
@@ -623,7 +643,7 @@ function createFileElement(filename) {
                     return;
                 }
 
-                model.judge_annotators = [annotator1, annotator2];
+                model.judge_annotators = [annotator1, annotator2, fieldName];
                 modalInstance.hide();
                 modal.addEventListener('hidden.bs.modal', () => {
                     modal.remove();
@@ -722,7 +742,11 @@ function startAnnotation(model, element) {
             second: {
                 id: model.judge_annotators[1],
                 name: document.querySelector(`[data-annotator-id="${model.judge_annotators[1]}"]`)?.getAttribute('data-annotator-name')
-            }
+            }, 
+            field_name: {
+                id: model.judge_annotators[2],
+                name: model.judge_annotators[2]
+            }, 
         } : undefined
     };
 
@@ -745,7 +769,7 @@ function pollAnnotationProgress(model, element) {
     function checkProgress() {
         // Include selected annotator details in status URL for judges
         const statusUrl = model.selected_annotators 
-            ? `/annotation_status/{{ project }}/${encodeURIComponent(model.annotator_id)}/${encodeURIComponent(model.selected_annotators.first.id)}/${encodeURIComponent(model.selected_annotators.second.id)}`
+            ? `/annotation_status/{{ project }}/${encodeURIComponent(model.annotator_id)}/${encodeURIComponent(model.selected_annotators.first.id)}/${encodeURIComponent(model.selected_annotators.second.id)}/${encodeURIComponent(model.selected_annotators.fieldName.id)}`
             : `/annotation_status/{{ project }}/${encodeURIComponent(model.annotator_id)}`;
 
         fetch(statusUrl)
@@ -871,6 +895,7 @@ addAnnotatorBtn.onclick = () => {
     document.getElementById('judgeAnnotators').style.display = 'none';
     document.getElementById('judgeAnnotator1').value = '';
     document.getElementById('judgeAnnotator2').value = '';
+    document.getElementById('judgeFieldName').value = '';
     document.getElementById('newAnnotatorName').value = '';
     document.getElementById('newAnnotatorModel').value = model.model_name;
     document.getElementById('newAnnotatorTemp').value = model.temperature;
