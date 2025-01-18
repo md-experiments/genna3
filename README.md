@@ -3,7 +3,7 @@
 Genna (GENerative ANNotation) is a LLM-centric text annotation system designed for efficient text annotation and comparison of AI model outputs.
 Genna makes it easy to test out different LLMs, prompts, temperature and scalability of structured calls.
 
-[![Genna Demo Tutorial](https://img.youtube.com/vi/96vzQGtxzoA/0.jpg)]([https://youtu.be/96vzQGtxzoA])
+[![Genna Demo Tutorial](https://img.youtube.com/vi/96vzQGtxzoA/0.jpg)](https://youtu.be/96vzQGtxzoA)
 
 
 ## Key Features at a Glance
